@@ -37,6 +37,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
     super.dispose();
   }
 
+  /*
+
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       String name = _nameController.text.trim();
@@ -46,27 +48,81 @@ class _UserFormScreenState extends State<UserFormScreen> {
       setState(() {
         isLoading = true;
       });
-      var response = await _apiService.customerLogin(name, number, address);
-      if (response['flag'] == 1) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(response['message'])));
 
-        final user = UserModel(id:3 ,name: name, number: number, address: address);
-        //Todo: pass actual user data from response
+      var response = await _apiService.customerLogin(name, number, address);
+
+      if (response['flag'] == 1 && response['data'] != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response['message'])),
+        );
+
+        final data = response['data'];
+
+        final user = UserModel(
+          id: data['customer_id'],
+          name: data['customer_name'],
+          number: data['mobile_no'],
+          address: data['address'],
+        );
+
+        // 🔐 Save user to session (AppProvider)
         Provider.of<AppProvider>(context, listen: false).setUser(user);
 
+        // 🚀 Navigate to product list
         context.push('/products');
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(response['message'])));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response['message'] ?? 'Login failed')),
+        );
       }
+
       setState(() {
         isLoading = false;
       });
     }
   }
+  */
+
+  Future<void> _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      String name = _nameController.text.trim();
+      String number = _numberController.text.trim();
+      String address = _addressController.text.trim();
+
+      setState(() => isLoading = true);
+
+      try {
+        var response = await _apiService.customerLogin(name, number, address);
+
+        if (response['flag'] == 1 && response['data'] != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response['message'])),
+          );
+
+          final data = response['data'];
+          print('Raw data: $data'); // 👈 Debugging line
+
+          final user = UserModel.fromJson(data); // 👈 This may throw
+          Provider.of<AppProvider>(context, listen: false).setUser(user);
+
+          context.push('/products');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response['message'] ?? 'Login failed')),
+          );
+        }
+      } catch (e, stack) {
+        print("❌ Error in _submitForm: $e");
+        print(stack);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Something went wrong!")),
+        );
+      } finally {
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {

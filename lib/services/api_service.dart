@@ -350,7 +350,7 @@ class ApiService {
     String mobile,
     String address,
   ) async {
-    return await _postRequest("retailcounter_user/v1/apiinsert", {
+    return await _postRequest("retailcounter_customer/v1/apiinsert", {
       'customer_name': customerName,
       'mobile_no': int.parse(mobile),
       'address': address,
@@ -391,12 +391,21 @@ class ApiService {
   }
 
   Future<int> placeOrder(Map<String, dynamic> data) async {
-    final response = await _postRequest('retailcounter_order/v1/apiinsert', data);
+    final response = await _postRequest(
+      'retailcounter_order/v1/apiinsert',
+      data,
+    );
     if (response['flag'] == 1 && response['code'] == 200) {
       return response['data']['order_id'];
     } else {
       throw Exception('Order failed: ${response['message']}');
     }
+  }
+
+  Future<Map<String, dynamic>> orderListById(String orderId) async {
+    return await _postRequest("retailcounter_order/v1/orderlistbyid", {
+      'order_id': orderId,
+    });
   }
 }
 

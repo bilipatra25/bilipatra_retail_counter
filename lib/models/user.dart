@@ -10,4 +10,13 @@ class UserModel {
     required this.number,
     required this.address,
   });
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['customer_id'],
+      name: json['customer_name'] ?? '',
+      number: json['mobile_no'].toString(),
+      address: json['address'] ?? '',
+    );
+  }
 }
