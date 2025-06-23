@@ -1,5 +1,6 @@
 import 'package:bilipatra_retail_counter/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -168,6 +169,10 @@ class _UserFormScreenState extends State<UserFormScreen> {
                     labelText: 'Phone Number',
                     border: OutlineInputBorder(),
                   ),
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(10),
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
                   validator:
                       (value) =>
                           value == null || value.isEmpty ? 'Required' : null,
