@@ -28,6 +28,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
   void initState() {
     super.initState();
     _apiService = ApiService(context);
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    appProvider.clearCart();
   }
 
   @override
