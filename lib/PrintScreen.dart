@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'TestPrint.dart';
 
 class PrintScreen extends StatefulWidget {
@@ -51,9 +52,10 @@ class _PrintScreenState extends State<PrintScreen> {
         setState(() {
           _devices = devices;
           _selectedDevice = matchedDevice;
-          _statusMessage = devices.isNotEmpty
-              ? 'Select a device to print'
-              : 'No paired Bluetooth printers found.';
+          _statusMessage =
+              devices.isNotEmpty
+                  ? 'Select a device to print'
+                  : 'No paired Bluetooth printers found.';
         });
       } else {
         setState(() {
@@ -80,9 +82,9 @@ class _PrintScreenState extends State<PrintScreen> {
   // Connect and print invoice
   Future<void> _connectAndPrint() async {
     if (_selectedDevice == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select a printer.")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Please select a printer.")));
       return;
     }
 
@@ -98,13 +100,13 @@ class _PrintScreenState extends State<PrintScreen> {
       final printer = TestPrint();
       await printer.printInvoice(widget.user, widget.products);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ Printing started.")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("✅ Printing started.")));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Print failed: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("❌ Print failed: $e")));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -113,56 +115,129 @@ class _PrintScreenState extends State<PrintScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Thermal Printer"),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Select Bluetooth Printer",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 10),
-            _devices.isEmpty
-                ? Text(_statusMessage)
-                : DropdownButton<BluetoothDevice>(
-              isExpanded: true,
-              value: _selectedDevice,
-              hint: const Text("Select a printer"),
-              items: _devices.map((device) {
-                return DropdownMenuItem(
-                  value: device,
-                  child: Text(device.name ?? "Unnamed Device"),
-                );
-              }).toList(),
-              onChanged: (val) {
-                setState(() {
-                  _selectedDevice = val;
-                });
-                if (val != null) _saveSelectedDevice(val);
-              },
-            ),
-            const SizedBox(height: 30),
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _connectAndPrint,
-                icon: const Icon(Icons.print),
-                label: const Text("Print Invoice"),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  textStyle: const TextStyle(fontSize: 16),
+      appBar: AppBar(title: const Text("Thermal Printer"), centerTitle: true),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Top scrollable section
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Select Bluetooth Printer",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _devices.isEmpty
+                        ? Text(_statusMessage)
+                        : DropdownButton<BluetoothDevice>(
+                          isExpanded: true,
+                          value: _selectedDevice,
+                          hint: const Text("Select a printer"),
+                          items:
+                              _devices.map((device) {
+                                return DropdownMenuItem(
+                                  value: device,
+                                  child: Text(device.name ?? "Unnamed Device"),
+                                );
+                              }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedDevice = val;
+                            });
+                            if (val != null) _saveSelectedDevice(val);
+                          },
+                        ),
+                    const SizedBox(height: 16),
+                    if (_isLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            if (_isLoading) const Center(child: CircularProgressIndicator()),
-          ],
+
+              // Bottom fixed buttons
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _connectAndPrint,
+                      icon: const Icon(Icons.print),
+                      label: const Text("Print Now"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black87,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        textStyle: const TextStyle(fontSize: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final confirm = await _showExitConfirmation(context);
+                        if (confirm == true) {
+                          Navigator.popUntil(context, (route) => route.isFirst);
+                        }
+                      },
+                      icon: const Icon(Icons.exit_to_app),
+                      label: const Text("Exit"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        textStyle: const TextStyle(fontSize: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Future<bool?> _showExitConfirmation(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text("Confirm Exit"),
+            content: const Text("Are you sure you want to exit to Home?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text("Yes"),
+              ),
+            ],
+          ),
     );
   }
 }
