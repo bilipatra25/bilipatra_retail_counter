@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'TestPrint.dart';
+import 'models/order_model.dart';
 
 class PrintScreen extends StatefulWidget {
   final dynamic user;
-  final List<dynamic> products;
+  final OrderModelResponse order;
 
-  const PrintScreen({super.key, required this.user, required this.products});
+  const PrintScreen({super.key, required this.user, required this.order});
 
   @override
   State<PrintScreen> createState() => _PrintScreenState();
@@ -98,12 +99,13 @@ class _PrintScreenState extends State<PrintScreen> {
       await _saveSelectedDevice(_selectedDevice!);
 
       final printer = TestPrint();
-      await printer.printInvoice(widget.user, widget.products);
+      await printer.printInvoice(widget.user, widget.order);
 
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("✅ Printing started.")));
     } catch (e) {
+      print(e);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("❌ Print failed: $e")));

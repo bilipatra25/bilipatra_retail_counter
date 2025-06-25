@@ -7,6 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'models/order_model.dart';
+import 'models/order_product.dart';
+
 ///Test printing
 class TestPrint {
   BlueThermalPrinter bluetooth = BlueThermalPrinter.instance;
@@ -175,23 +178,30 @@ class TestPrint {
 
 
 
-  Future<void> printInvoice(dynamic user, List<dynamic> products) async {
+  Future<void> printInvoice(dynamic user, OrderModelResponse order) async {
     bool? isConnected = await bluetooth.isConnected;
     if (isConnected != true) return;
 
-    // DATE + INVOICE ID
     final now = DateTime.now();
     final formattedDate = DateFormat('dd-MM-yyyy HH:mm').format(now);
-    final invoiceId = "INV${now.millisecondsSinceEpoch.toString().substring(7)}";
+    final invoiceId = "#${order.orderId}";
+
     ByteData bytesAsset = await rootBundle.load("assets/logo_min_gr.png");
-    Uint8List imageBytesFromAsset = bytesAsset.buffer
-        .asUint8List(bytesAsset.offsetInBytes, bytesAsset.lengthInBytes);
-    bluetooth.printImageBytes(imageBytesFromAsset); //image from Asset
+    Uint8List imageBytesFromAsset = bytesAsset.buffer.asUint8List(
+      bytesAsset.offsetInBytes,
+      bytesAsset.lengthInBytes,
+    );
+    bluetooth.printImageBytes(imageBytesFromAsset);
     await Future.delayed(const Duration(milliseconds: 200));
+
     bluetooth.printNewLine();
     bluetooth.printCustom("Bilipatra Retail", Size.boldMedium.val, Align.center.val);
     bluetooth.printCustom("GSTIN: 27ABCDE1234F1Z5", Size.medium.val, Align.center.val);
-    bluetooth.printCustom("F-2, Soham Pride,Nr. Time Square-Gauravpath, Besides DMART, TP 10 Main Rd, Pal Gam, Surat, Gujarat 395009", Size.medium.val, Align.center.val);
+    bluetooth.printCustom(
+      "F-2, Soham Pride,Nr. Time Square-Gauravpath, Besides DMART, TP 10 Main Rd, Pal Gam, Surat, Gujarat 395009",
+      Size.medium.val,
+      Align.center.val,
+    );
     bluetooth.printCustom("+91 91043 32327", Size.medium.val, Align.center.val);
     bluetooth.printCustom("care@bilipatra.com", Size.medium.val, Align.center.val);
     bluetooth.printCustom("INVOICE", Size.bold.val, Align.center.val);
@@ -204,35 +214,35 @@ class TestPrint {
     bluetooth.printLeftRight("Customer", user.name ?? "-", Size.medium.val);
     bluetooth.printLeftRight("Phone", user.number ?? "-", Size.medium.val);
     bluetooth.printLeftRight("Address", user.address ?? "-", Size.medium.val);
+    bluetooth.printLeftRight("Payment Mode", order.orderType.toUpperCase(), Size.medium.val);
 
     bluetooth.printNewLine();
     bluetooth.printCustom("Item              Qty     Amount", Size.bold.val, Align.left.val);
     bluetooth.printCustom("--------------------------------", Size.medium.val, Align.left.val);
 
-    for (var item in products) {
-      final total = item.price * item.quantity;
-      final lines = _wrapText(item.name.toString(), 16); // wrap item name
+    for (var item in order.productList) {
+      final lines = _wrapText("${item.name} (${item.weight})", 16);
       for (int i = 0; i < lines.length; i++) {
         if (i == 0) {
-          final qty = "x${item.quantity}".padRight(5);
-          final amt = "Rs. ${total.toStringAsFixed(2)}";
+          final qty = "x${item.qty}".padRight(5);
+          final amt = "Rs. ${item.netAmount.toStringAsFixed(2)}";
           bluetooth.printCustom("${lines[i].padRight(16)} $qty $amt", Size.medium.val, Align.left.val);
         } else {
-          bluetooth.printCustom("${lines[i]}", Size.medium.val, Align.left.val);
+          bluetooth.printCustom(lines[i], Size.medium.val, Align.left.val);
         }
       }
       await Future.delayed(const Duration(milliseconds: 100));
     }
 
     bluetooth.printCustom("--------------------------------", Size.medium.val, Align.left.val);
-
-    final double totalAmount = products.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
-    bluetooth.printLeftRight("Total", "Rs. ${totalAmount.toStringAsFixed(2)}", Size.bold.val);
+    bluetooth.printLeftRight("Subtotal", "Rs. ${(order.totalAmount + order.totalDiscount - order.gstAmount).toStringAsFixed(2)}", Size.medium.val);
+    bluetooth.printLeftRight("Discount", "- Rs. ${order.totalDiscount.toStringAsFixed(2)}", Size.medium.val);
+    bluetooth.printLeftRight("GST", "+ Rs. ${order.gstAmount.toStringAsFixed(2)}", Size.medium.val);
+    bluetooth.printCustom("--------------------------------", Size.medium.val, Align.left.val);
+    bluetooth.printLeftRight("Total", "Rs. ${order.totalAmount.toStringAsFixed(2)}", Size.bold.val);
 
     bluetooth.printNewLine();
     bluetooth.printCustom("Scan below to view digital bill", Size.medium.val, Align.center.val);
-
-    // 🧾 QR code for bill (replace with actual URL generation logic)
     final billUrl = "https://bilipatra.com/bill/$invoiceId";
     await bluetooth.printQRcode(billUrl, 200, 200, Align.center.val);
     await Future.delayed(const Duration(milliseconds: 300));
@@ -246,6 +256,7 @@ class TestPrint {
     await bluetooth.paperCut();
     await bluetooth.disconnect();
   }
+
   List<String> _wrapText(String text, int width) {
     List<String> lines = [];
     while (text.length > width) {

@@ -241,14 +241,12 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                     final user = appProvider.user;
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder:
-                            (_) => PrintScreen(
-                              user: appProvider.user,
-                              products:
-                                  order!.productList.map((p) => p).toList(),
-                            ),
-                      ),
+                        MaterialPageRoute(
+                          builder: (_) => PrintScreen(
+                            user: appProvider.user,
+                            order: order!,
+                          ),
+                        ),
                     );
                   },
                   icon: const Icon(Icons.print),
