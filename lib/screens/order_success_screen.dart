@@ -239,15 +239,45 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                       listen: false,
                     );
                     final user = appProvider.user;
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      builder: (context) => Padding(
+                        padding: EdgeInsets.only(
+                          bottom: MediaQuery.of(context).viewInsets.bottom,
+                        ),
+                        child: Wrap(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                              child: PrintScreen(user: user, order: order!),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+
+
+  /*                  showDialog(
+                      context: context,
+                      builder: (_) => Dialog.fullscreen(
+                        child: PrintScreen(user: user, order: order!),
+                      ),
+                    );*/
+
+/*
                     Navigator.push(
                       context,
-                        MaterialPageRoute(
-                          builder: (_) => PrintScreen(
-                            user: appProvider.user,
-                            order: order!,
-                          ),
-                        ),
-                    );
+                      MaterialPageRoute(
+                        builder: (_) => PrintScreen(user: user, order: order!),
+                        fullscreenDialog: true,
+                      ),
+                    );*/
+
                   },
                   icon: const Icon(Icons.print),
                   label: const Text("Print Invoice"),
