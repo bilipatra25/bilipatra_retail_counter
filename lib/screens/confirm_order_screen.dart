@@ -29,23 +29,23 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                 (p) => {
                   "product_id": p.id,
                   "qty": p.quantity,
-                  "unit": "pcs",
-                  "discount": 0,
+                  // "unit": "pcs",
+                  // "discount": 0,
                 },
               )
               .toList();
 
       final data = {
         "order_type": _selectedOrderType.value,
-        "order_status": "pending",
-        "GST_amount": 0,
-        // or calculate accordingly
-        "total_discount": 0,
-        // or calculate accordingly
-        "total_amount": products.fold(
-          0.0,
-          (sum, item) => sum + item.price * item.quantity,
-        ),
+        // "order_status": "pending",
+        // "GST_amount": 0,
+        // // or calculate accordingly
+        // "total_discount": 0,
+        // // or calculate accordingly
+        // "total_amount": products.fold(
+        //   0.0,
+        //   (sum, item) => sum + item.price * item.quantity,
+        // ),
         "customer_id": user?.id ?? 1,
         "product_list": productList,
       };
@@ -73,10 +73,12 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
     final user = appProvider.user;
     final products = appProvider.selectedProducts;
 
-    double total = products.fold(
+    double subtotal = products.fold(
       0,
       (sum, item) => sum + (item.price * item.quantity),
     );
+    double gstAmount = subtotal * 0.05;
+    double total = subtotal + gstAmount;
 
     return Scaffold(
       appBar: AppBar(
@@ -96,6 +98,7 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -174,80 +177,121 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             },
                           ),
                           const SizedBox(height: 12),
-                        ],
-                      ),
-                    ),
-                  ),
 
-                  const Divider(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        'Total: ₹ ${total.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12.0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.payment, color: Colors.green),
-                          const SizedBox(width: 10),
-                          const Text(
-                            "Payment Type:",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                          const Divider(),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Subtotal:',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                    Text(
+                                      '₹ ${subtotal.toStringAsFixed(2)}',
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'GST (5%):',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                    Text(
+                                      '₹ ${gstAmount.toStringAsFixed(2)}',
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Total:',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                    Text(
+                                      '₹ ${total.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<OrderType>(
-                                value: _selectedOrderType,
-                                isExpanded: true,
-                                icon: const Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                ),
-                                dropdownColor: Colors.white,
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0, top: 6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(12),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black87,
-                                ),
-                                onChanged: (OrderType? newValue) {
-                                  if (newValue != null) {
-                                    setState(() {
-                                      _selectedOrderType = newValue;
-                                    });
-                                  }
-                                },
-                                items:
-                                    OrderType.values.map((OrderType type) {
-                                      return DropdownMenuItem<OrderType>(
-                                        value: type,
-                                        child: Text(type.label),
-                                      );
-                                    }).toList(),
+                                border: Border.all(color: Colors.green.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.payment, color: Colors.green),
+                                  const SizedBox(width: 10),
+                                  const Text(
+                                    "Payment Type:",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<OrderType>(
+                                        value: _selectedOrderType,
+                                        isExpanded: true,
+                                        icon: const Icon(
+                                          Icons.keyboard_arrow_down_rounded,
+                                        ),
+                                        dropdownColor: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.black87,
+                                        ),
+                                        onChanged: (OrderType? newValue) {
+                                          if (newValue != null) {
+                                            setState(() {
+                                              _selectedOrderType = newValue;
+                                            });
+                                          }
+                                        },
+                                        items:
+                                        OrderType.values.map((OrderType type) {
+                                          return DropdownMenuItem<OrderType>(
+                                            value: type,
+                                            child: Text(type.label),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
