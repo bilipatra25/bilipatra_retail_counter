@@ -184,7 +184,6 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                 ],
               ),
               ...order!.productList.map((p) {
-                final amount = p.qty * p.price;
                 return TableRow(
                   children: [
                     Padding(
@@ -201,7 +200,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.all(8.0),
-                      child: Text("₹${amount.toStringAsFixed(2)}"),
+                      child: Text("₹${p.netAmount.toStringAsFixed(2)}"),
                     ),
                   ],
                 );
