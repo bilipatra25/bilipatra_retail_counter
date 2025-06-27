@@ -29,7 +29,7 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                 (p) => {
                   "product_id": p.id,
                   "qty": p.quantity,
-                  // "unit": "pcs",
+                  "unit": "pcs",
                   // "discount": 0,
                 },
               )
