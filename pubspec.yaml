@@ -47,6 +47,13 @@ dependencies:
   shared_preferences: ^2.5.3
   connectivity_plus: ^6.1.4
 dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo_sq.png" # your icon path
+  adaptive_icon_background: "#ffffff"               # Background color or image
+
   flutter_test:
     sdk: flutter
 
