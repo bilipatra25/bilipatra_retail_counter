@@ -197,7 +197,7 @@ class TestPrint {
     bluetooth.printNewLine();
     bluetooth.printCustom("Bilipatra Retail", Size.boldMedium.val, Align.center.val);
     bluetooth.printNewLine();
-    bluetooth.printCustom("GSTIN: 24AFKPS7159K1ZR", Size.medium.val, Align.center.val);
+    bluetooth.printCustom("GSTIN: 24AFXPJ5756J1ZR", Size.medium.val, Align.center.val);
     bluetooth.printCustom("FSSAI: 1072298000084", Size.medium.val, Align.center.val);
     bluetooth.printCustom(
       "F-2, Soham Pride,Nr. Time Square-Gauravpath, Besides DMART, TP 10 Main Rd, Pal Gam, Surat, Gujarat 395009",
