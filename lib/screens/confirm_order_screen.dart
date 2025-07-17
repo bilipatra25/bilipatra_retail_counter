@@ -23,17 +23,16 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
 
     try {
       final api = ApiService(context);
-      final List<Map<String, dynamic>> productList =
-          products
-              .map<Map<String, dynamic>>(
-                (p) => {
-                  "product_id": p.id,
-                  "qty": p.quantity,
-                  "unit": "pcs",
-                  // "discount": 0,
-                },
-              )
-              .toList();
+      final List<Map<String, dynamic>> productList = products
+          .map<Map<String, dynamic>>(
+            (p) => {
+              "product_id": p.id,
+              "qty": p.quantity,
+              "unit": "pcs",
+              // "discount": 0,
+            },
+          )
+          .toList();
 
       final data = {
         "order_type": _selectedOrderType.value,
@@ -50,13 +49,28 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
         "product_list": productList,
       };
 
-      final orderId = await api.placeOrder(data);
+      final orderData = await api.placeOrder(data);
 
-      // Navigate to Success Screen
-      context.goNamed(
-        'orderSuccess',
-        pathParameters: {'orderId': orderId.toString()},
-      );
+      if (_selectedOrderType == OrderType.cash) {
+        context.goNamed(
+          'orderSuccess',
+          pathParameters: {
+            'orderId': orderData['order_id'].toString(),
+          },
+        );
+      } else if (_selectedOrderType == OrderType.online) {
+        context.goNamed(
+          'paymentImage',
+          extra: {
+            'orderId': orderData['order_id'],
+            'imageUrl': orderData['image_url'],
+          },
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unknown order type selected')),
+        );
+      }
     } catch (e) {
       print(e);
       ScaffoldMessenger.of(
@@ -177,14 +191,14 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             },
                           ),
                           const SizedBox(height: 12),
-
                           const Divider(),
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Column(
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text(
                                       'Subtotal:',
@@ -198,7 +212,8 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text(
                                       'GST (5%):',
@@ -212,7 +227,8 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text(
                                       'Total:',
@@ -236,7 +252,8 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 12.0, top: 6),
+                            padding:
+                                const EdgeInsets.only(bottom: 12.0, top: 6),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -245,11 +262,13 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.green.shade200),
+                                border:
+                                    Border.all(color: Colors.green.shade200),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.payment, color: Colors.green),
+                                  const Icon(Icons.payment,
+                                      color: Colors.green),
                                   const SizedBox(width: 10),
                                   const Text(
                                     "Payment Type:",
@@ -281,8 +300,8 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                             });
                                           }
                                         },
-                                        items:
-                                        OrderType.values.map((OrderType type) {
+                                        items: OrderType.values
+                                            .map((OrderType type) {
                                           return DropdownMenuItem<OrderType>(
                                             value: type,
                                             child: Text(type.label),
@@ -304,43 +323,39 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed:
-                              _isLoading
-                                  ? null
-                                  : () async {
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder:
-                                          (_) => AlertDialog(
-                                            title: const Text("Place Order?"),
-                                            content: const Text(
-                                              "Do you want to place this order?",
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      context,
-                                                      false,
-                                                    ),
-                                                child: const Text("Cancel"),
-                                              ),
-                                              TextButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      context,
-                                                      true,
-                                                    ),
-                                                child: const Text("Confirm"),
-                                              ),
-                                            ],
+                          onPressed: _isLoading
+                              ? null
+                              : () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text("Place Order?"),
+                                      content: const Text(
+                                        "Do you want to place this order?",
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(
+                                            context,
+                                            false,
                                           ),
-                                    );
+                                          child: const Text("Cancel"),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(
+                                            context,
+                                            true,
+                                          ),
+                                          child: const Text("Confirm"),
+                                        ),
+                                      ],
+                                    ),
+                                  );
 
-                                    if (confirm ?? false) {
-                                      await _placeOrder(user, products);
-                                    }
-                                  },
+                                  if (confirm ?? false) {
+                                    await _placeOrder(user, products);
+                                  }
+                                },
                           icon: const Icon(Icons.shopping_bag),
                           label: Text(
                             _isLoading ? "Placing Order..." : "Place Order",
