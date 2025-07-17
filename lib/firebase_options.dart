@@ -41,50 +41,54 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-      apiKey: "AIzaSyCShLKUvRcA0O6QTgH4ZL7QthTAIyFnohM",
-      authDomain: "storelocator-fe8e7.firebaseapp.com",
-      databaseURL: "https://storelocator-fe8e7-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "storelocator-fe8e7",
-      storageBucket: "storelocator-fe8e7.firebasestorage.app",
-      messagingSenderId: "106870549521",
-      appId: "1:106870549521:web:0f123668e7efb9f97c15b0",
-      measurementId: "G-MWR9070Q50"
+    apiKey: 'AIzaSyCShLKUvRcA0O6QTgH4ZL7QthTAIyFnohM',
+    appId: '1:106870549521:web:0f123668e7efb9f97c15b0',
+    messagingSenderId: '106870549521',
+    projectId: 'storelocator-fe8e7',
+    authDomain: 'storelocator-fe8e7.firebaseapp.com',
+    databaseURL: 'https://storelocator-fe8e7-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'storelocator-fe8e7.firebasestorage.app',
+    measurementId: 'G-MWR9070Q50',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCyniAB8Ewcd2mq4Ju55szARC2qV-0an64',
-    appId: '1:106870549521:android:0b40f13fa47bc10c7c15b0',
+    appId: '1:106870549521:android:ba26f7a19a9bdb9f7c15b0',
     messagingSenderId: '106870549521',
     projectId: 'storelocator-fe8e7',
+    databaseURL: 'https://storelocator-fe8e7-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'storelocator-fe8e7.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyC7Ew7MWs9WXwN7lU6-teU3-UFx_4tghuM',
-    appId: '1:106870549521:ios:d206c04c8951f1617c15b0',
+    appId: '1:106870549521:ios:9718e1233b85a2a87c15b0',
     messagingSenderId: '106870549521',
     projectId: 'storelocator-fe8e7',
+    databaseURL: 'https://storelocator-fe8e7-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'storelocator-fe8e7.firebasestorage.app',
-    iosBundleId: 'com.example.b12greenfoodOrderonline',
+    iosBundleId: 'com.example.bilipatraRetailCounter',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyC7Ew7MWs9WXwN7lU6-teU3-UFx_4tghuM',
-    appId: '1:106870549521:ios:d206c04c8951f1617c15b0',
+    appId: '1:106870549521:ios:9718e1233b85a2a87c15b0',
     messagingSenderId: '106870549521',
     projectId: 'storelocator-fe8e7',
+    databaseURL: 'https://storelocator-fe8e7-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'storelocator-fe8e7.firebasestorage.app',
-    iosBundleId: 'com.example.b12greenfoodOrderonline',
+    iosBundleId: 'com.example.bilipatraRetailCounter',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyCShLKUvRcA0O6QTgH4ZL7QthTAIyFnohM',
-    appId: '1:106870549521:web:3ed174c07e1ee9ac7c15b0',
+    appId: '1:106870549521:web:a609ac8ceed426967c15b0',
     messagingSenderId: '106870549521',
     projectId: 'storelocator-fe8e7',
     authDomain: 'storelocator-fe8e7.firebaseapp.com',
+    databaseURL: 'https://storelocator-fe8e7-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'storelocator-fe8e7.firebasestorage.app',
-    measurementId: 'G-2EVRHFX24K',
+    measurementId: 'G-LWLR6B894S',
   );
 
 }
