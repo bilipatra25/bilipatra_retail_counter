@@ -357,6 +357,18 @@ class ApiService {
     });
   }
 
+  Future<Map<String, dynamic>> saveFcmToken(
+       String deviceId,
+       String fcmToken,
+       String platform,
+  ) async {
+    return await _postRequest("retail_fcm_token/v1/saveretailfcmtoken", {
+      'device_id': deviceId,
+      'fcm_token': fcmToken,
+      'platform': platform,
+    });
+  }
+
   Future<http.Response> insertUser(Map<String, dynamic> userData) async {
     final url = '$baseUrl/user/v1/apiinsert';
     final headers = {'Content-Type': 'application/json; charset=UTF-8'};

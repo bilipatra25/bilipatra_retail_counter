@@ -1,8 +1,10 @@
 import 'package:bilipatra_retail_counter/services/api_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 import '../models/user.dart';
 import '../providers/app_provider.dart';
@@ -28,6 +30,47 @@ class _UserFormScreenState extends State<UserFormScreen> {
     super.initState();
     _apiService = ApiService(context);
     Provider.of<AppProvider>(context, listen: false).clearCart();
+    _initFcmToken();
+  }
+
+  Future<String> getDeviceId() async {
+    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+    AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+    return androidInfo.id ?? 'unknown';
+  }
+
+  void _initFcmToken() async {
+    String deviceId = await getDeviceId(); // Await and use this value
+    String? token = await FirebaseMessaging.instance.getToken();
+
+    if (token != null) {
+      await saveFcmToken(
+        deviceId: deviceId,
+        fcmToken: token,
+        platform: "android",
+      );
+    }
+  }
+
+  Future<void> saveFcmToken({
+    required String deviceId,
+    required String fcmToken,
+    required String platform,
+  }) async {
+    try {
+      final response = await ApiService(
+        context,
+      ).saveFcmToken(deviceId, fcmToken, platform);
+
+      if (response['flag'] == 1) {
+        print('✅ FCM token saved successfully');
+      } else {
+        print('❌ Failed to save FCM token: ${response['message']}');
+        // print(response.body);
+      }
+    } catch (e) {
+      print('❌ Error saving FCM token: $e');
+    }
   }
 
   @override
@@ -63,9 +106,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
       } catch (e, stack) {
         print("❌ Error: $e");
         print(stack);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Something went wrong!")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Something went wrong!")));
       } finally {
         setState(() => isLoading = false);
       }
@@ -87,7 +130,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12)],
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 12),
+                ],
               ),
               child: Form(
                 key: _formKey,
@@ -110,7 +155,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           labelText: 'Full Name',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                        validator:
+                            (value) =>
+                                value == null || value.isEmpty
+                                    ? 'Required'
+                                    : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -124,7 +173,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           LengthLimitingTextInputFormatter(10),
                           FilteringTextInputFormatter.digitsOnly,
                         ],
-                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                        validator:
+                            (value) =>
+                                value == null || value.isEmpty
+                                    ? 'Required'
+                                    : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -134,24 +187,35 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           labelText: 'Address',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                        validator:
+                            (value) =>
+                                value == null || value.isEmpty
+                                    ? 'Required'
+                                    : null,
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: isLoading ? null : _submitForm,
-                          icon: isLoading
-                              ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                              : const Icon(Icons.arrow_forward),
-                          label: Text(isLoading ? 'Please wait...' : 'Continue to Products'),
+                          icon:
+                              isLoading
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                  : const Icon(Icons.arrow_forward),
+                          label: Text(
+                            isLoading
+                                ? 'Please wait...'
+                                : 'Continue to Products',
+                          ),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             backgroundColor: Colors.green,
@@ -159,7 +223,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                             textStyle: const TextStyle(fontSize: 16),
                           ),
                         ),
-                      )
+                      ),
                     ],
                   ),
                 ),
