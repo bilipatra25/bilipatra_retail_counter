@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
+import 'firebase_options.dart';
 import 'providers/app_provider.dart';
 import 'routes/app_router.dart';
 
@@ -16,8 +17,9 @@ import 'dart:convert';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   // Get the token just for debug
   String? token = await FirebaseMessaging.instance.getToken();
   print('🔔 FCM Token: $token');
