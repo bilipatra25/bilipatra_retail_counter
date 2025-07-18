@@ -133,7 +133,7 @@ class NotificationService {
 
       RemoteNotification? notification = message.notification;
       //Replace with key approach
-      if (notification!.title!.contains("Order Delivered Successfully")) {
+      if (notification!.title!.contains("Payment Received")) {
         if (NotificationEventHandler.onOrderDelivered != null) {
           NotificationEventHandler.onOrderDelivered!(message);
         }
