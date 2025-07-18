@@ -18,8 +18,8 @@ class ApiService {
   // static const String baseUrl = 'http://13.233.150.163:8084/storelocate';
   // static const String baseUrl = 'http://172.20.10.4:8084/storelocate';
   // static const String baseUrl = 'http://192.168.31.76:8084/storelocate'; //Local
-  // static const String baseUrl = 'https://b12greenfood.shop:3003/storelocate'; //Live
-  static const String baseUrl = 'http://3.108.43.136:8084/storelocate'; //Dev
+  static const String baseUrl = 'https://b12greenfood.shop:3003/storelocate'; //Live
+  // static const String baseUrl = 'http://3.108.43.136:8084/storelocate'; //Dev
   ApiService(this.context);
 
   void _logRequest(
