@@ -15,19 +15,29 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 🔧 Setup flutter_local_notifications plugin before using it
+  await NotificationService.instance.setupFlutterNotifications();
+
+  // ✅ Now initialize FCM and related configurations
   await NotificationService.instance.initialize();
-  // Get the token just for debug
+
+  // 🧪 Debug: Print FCM Token
   String? token = await FirebaseMessaging.instance.getToken();
   print('🔔 FCM Token: $token');
 
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+  // Foreground message listener
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     print("🔔 Foreground notification: ${message.notification?.title}");
+
+    // Show as local notification when app is in foreground
+    await NotificationService.instance.showNotification(message);
   });
 
   runApp(const BilipatraApp());

@@ -21,15 +21,17 @@ class NotificationService {
   bool _isFlutterLocalNotificationsInitialized = false;
 
   Future<void> initialize() async {
+    await setupFlutterNotifications(); // Initialize local notifications before anything else
+
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Request permission
+    // Request notification permissions from the user
     await _requestPermission();
 
-    // Setup message handlers
+    // Setup foreground/background message handlers
     await _setupMessageHandlers();
 
-    // Get FCM token
+    // Get and print the FCM device token
     final token = await _messaging.getToken();
     print('FCM Token: $token');
   }
