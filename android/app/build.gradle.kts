@@ -15,6 +15,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true // 👉 "isCoreLibraryDesugaringEnabled"
     }
 
     kotlinOptions {
@@ -47,4 +48,5 @@ flutter {
 
 dependencies {
     implementation("com.google.firebase:firebase-messaging:23.4.1")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

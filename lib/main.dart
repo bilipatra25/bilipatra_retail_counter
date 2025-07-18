@@ -1,5 +1,6 @@
 import 'package:bilipatra_retail_counter/services/api_service.dart';
 import 'package:bilipatra_retail_counter/services/invoice_generator.dart';
+import 'package:bilipatra_retail_counter/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +21,7 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await NotificationService.instance.initialize();
   // Get the token just for debug
   String? token = await FirebaseMessaging.instance.getToken();
   print('🔔 FCM Token: $token');
