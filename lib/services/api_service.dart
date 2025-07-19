@@ -345,6 +345,14 @@ class ApiService {
 
   ///Example Ends ------
 
+  Future<Map<String, dynamic>> userSelectByMobileNo(
+    String mobile,
+  ) async {
+    return await _postRequest("retailcounter_customer/v1/apiuserselectbymobileno", {
+      'mobile_no': int.parse(mobile),
+    });
+  }
+
   Future<Map<String, dynamic>> customerLogin(
     String customerName,
     String mobile,

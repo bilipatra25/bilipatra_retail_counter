@@ -1,10 +1,10 @@
 import 'package:bilipatra_retail_counter/services/api_service.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 import '../models/user.dart';
 import '../providers/app_provider.dart';
@@ -79,6 +79,55 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _numberController.dispose();
     _addressController.dispose();
     super.dispose();
+  }
+
+  Future<void> fetchCustomerByMobile(String mobile) async {
+    if (mobile.length != 10) return;
+
+    final response = await _apiService.userSelectByMobileNo(
+      _numberController.text.trim(),
+    );
+
+    if (response['flag'] == 1 && response['data'] != null && response['data'].isNotEmpty) {
+      final customer = response['data'][0];
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Use Existing Customer?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Name: ${customer['customer_name']}'),
+              Text('Phone: ${customer['mobile_no']}'),
+              Text('Address: ${customer['address']}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        setState(() {
+          _nameController.text = customer['customer_name'];
+          _addressController.text = customer['address'];
+        });
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(response['message'] ?? 'Customer not found')),
+      );
+    }
   }
 
   Future<void> _submitForm() async {
@@ -173,6 +222,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           LengthLimitingTextInputFormatter(10),
                           FilteringTextInputFormatter.digitsOnly,
                         ],
+                        onChanged: (value) {
+                          fetchCustomerByMobile(value);
+                        },
                         validator:
                             (value) =>
                                 value == null || value.isEmpty
