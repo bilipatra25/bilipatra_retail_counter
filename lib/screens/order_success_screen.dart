@@ -213,7 +213,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text("Subtotal: ₹${(order!.totalAmount-order!.gstAmount).toStringAsFixed(2)}"),
+                Text("Subtotal: ₹${(order!.subTotal).toStringAsFixed(2)}"),
                 Text("GST: ₹${order!.gstAmount.toStringAsFixed(2)}"),
                 Text("Discount: ₹${order!.totalDiscount.toStringAsFixed(2)}"),
                 const Divider(thickness: 1),

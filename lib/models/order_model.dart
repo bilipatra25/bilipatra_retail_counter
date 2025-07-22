@@ -11,6 +11,7 @@ class OrderModelResponse {
   final double gstAmount;
   final double totalDiscount;
   final double totalAmount;
+  final double subTotal;
   final List<OrderProduct> productList;
 
   OrderModelResponse({
@@ -24,6 +25,7 @@ class OrderModelResponse {
     required this.gstAmount,
     required this.totalDiscount,
     required this.totalAmount,
+    required this.subTotal,
     required this.productList,
   });
 
@@ -39,6 +41,7 @@ class OrderModelResponse {
       gstAmount: double.tryParse(json['GST_amount'].toString()) ?? 0,
       totalDiscount: double.tryParse(json['total_discount'].toString()) ?? 0,
       totalAmount: double.tryParse(json['total_amount'].toString()) ?? 0,
+      subTotal: double.tryParse(json['SubTotal'].toString()) ?? 0,
       productList:
           (json['product_list'] as List)
               .map((e) => OrderProduct.fromJson(e))
