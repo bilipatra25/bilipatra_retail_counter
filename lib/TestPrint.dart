@@ -264,7 +264,7 @@ class TestPrint {
 
     // Print Totals
     bluetooth.printCustom("-" * maxLineLength, Size.medium.val, Align.left.val);
-    bluetooth.printCustom(formatLeftRight("Subtotal", "Rs.${(order.totalAmount - order.gstAmount).toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
+    bluetooth.printCustom(formatLeftRight("Subtotal", "Rs.${(order.subTotal).toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
     bluetooth.printCustom(formatLeftRight("Discount", "-Rs.${order.totalDiscount.toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
     bluetooth.printCustom(formatLeftRight("GST", "+Rs.${order.gstAmount.toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
     bluetooth.printCustom("-" * maxLineLength, Size.medium.val, Align.left.val);
