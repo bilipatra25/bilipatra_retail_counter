@@ -397,7 +397,7 @@ class ApiService {
   }
 
   Future<List<ProductModel>> productList(int pageIndex, int pageSize) async {
-    final response = await _postRequest("product_detail/v1/apiselectall", {
+    final response = await _postRequest("retail_product_detail/v1/retail_apiselectall", {
       'pageIndex': pageIndex,
       'pageSize': pageSize,
       'searchParam': {'global_search': '', 'product_name': ''},

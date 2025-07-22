@@ -89,10 +89,15 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
 
     double subtotal = products.fold(
       0,
-      (sum, item) => sum + (item.price * item.quantity),
+          (sum, item) => sum + (item.price * item.quantity),
     );
-    double gstAmount = subtotal * 0.05;
-    double total = subtotal + gstAmount;
+
+// Assuming 5% GST included in subtotal
+    double gstRate = 0.05;
+    double gstAmount = subtotal * gstRate / (1 + gstRate); // Back-calculating GST
+    double baseAmount = subtotal - gstAmount; // Amount before GST
+    double total = subtotal; // Total remains same since GST is included
+
 
     return Scaffold(
       appBar: AppBar(
@@ -205,7 +210,7 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                       style: TextStyle(fontSize: 16),
                                     ),
                                     Text(
-                                      '₹ ${subtotal.toStringAsFixed(2)}',
+                                      '₹ ${baseAmount.toStringAsFixed(2)}',
                                       style: const TextStyle(fontSize: 16),
                                     ),
                                   ],
