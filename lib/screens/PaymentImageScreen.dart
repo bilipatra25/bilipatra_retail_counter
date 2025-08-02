@@ -27,7 +27,8 @@ class _PaymentImageScreenState extends State<PaymentImageScreen> {
 
   void _handleOrderDelivered(RemoteMessage message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Your order has been delivered successfully!")),
+      const SnackBar(
+          content: Text("Your order has been delivered successfully!")),
     );
 
     // Delay navigation to allow Snackbar to show
@@ -54,6 +55,8 @@ class _PaymentImageScreenState extends State<PaymentImageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
         title: const Text('Complete Payment'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -76,13 +79,14 @@ class _PaymentImageScreenState extends State<PaymentImageScreen> {
               child: SizedBox.expand(
                 child: Image.network(
                   widget.imageUrl,
-                  fit: BoxFit.cover,
+                  fit: BoxFit.contain,
                   loadingBuilder: (context, child, progress) {
                     if (progress == null) return child;
                     return const Center(child: CircularProgressIndicator());
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    return const Center(child: Text('Failed to load payment image'));
+                    return const Center(
+                        child: Text('Failed to load payment image'));
                   },
                 ),
               ),
@@ -93,7 +97,15 @@ class _PaymentImageScreenState extends State<PaymentImageScreen> {
             child: ElevatedButton.icon(
               icon: const Icon(Icons.check_circle),
               label: const Text('Done'),
-              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+              style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  minimumSize: const Size.fromHeight(50),
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  iconColor: Colors.white),
               onPressed: () => _navigateToSuccess(context),
             ),
           ),
