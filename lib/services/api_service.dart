@@ -422,6 +422,15 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> orderList(int page,int limit) async {
+    return await _postRequest("retailcounter_order/v1/orderlist", {
+      'page': page,
+      'limit': limit,
+      // 'from_date': from_date,
+      // 'to_date': to_date,
+    });
+  }
+
   Future<Map<String, dynamic>> orderListById(String orderId) async {
     return await _postRequest("retailcounter_order/v1/orderlistbyid", {
       'order_id': orderId,

@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/order.dart';
+import '../models/order_model.dart';
 import '../models/user.dart';
 import '../providers/app_provider.dart';
 
@@ -81,6 +83,22 @@ class _UserFormScreenState extends State<UserFormScreen> {
     super.dispose();
   }
 
+  List<Order> recentOrders = [];
+
+  Future<List<Order>> _fetchRecentOrders() async {
+    try {
+      final api = ApiService(context);
+      final res = await api.orderList(1, 3); // page, limit
+      if (res['flag'] == 1 && res['data'] != null) {
+        final resultList = res['data']['result'] as List;
+        return resultList.map((e) => Order.fromJson(e)).toList();
+      }
+    } catch (e) {
+      print("❌ Error loading orders: $e");
+    }
+    return [];
+  }
+
   Future<void> fetchCustomerByMobile(String mobile) async {
     if (mobile.length != 10) return;
 
@@ -88,7 +106,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
       _numberController.text.trim(),
     );
 
-    if (response['flag'] == 1 && response['data'] != null && response['data'].isNotEmpty) {
+    if (response['flag'] == 1 &&
+        response['data'] != null &&
+        response['data'].isNotEmpty) {
       final customer = response['data'][0];
 
       final confirmed = await showDialog<bool>(
@@ -143,9 +163,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
         if (response['flag'] == 1 && response['data'] != null) {
           final user = UserModel.fromJson(response['data']);
           Provider.of<AppProvider>(context, listen: false).setUser(user);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(response['message'] ?? 'Login Successful')),
-          );
+          // ScaffoldMessenger.of(context).showSnackBar(
+          //   SnackBar(content: Text(response['message'] ?? 'Login Successful')),
+          // );
           context.push('/products');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -204,19 +224,21 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           labelText: 'Full Name',
                           border: OutlineInputBorder(),
                         ),
-                        validator:
-                            (value) =>
-                                value == null || value.isEmpty
-                                    ? 'Required'
-                                    : null,
+                        validator: (value) =>
+                            value == null || value.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _numberController,
                         keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Phone Number',
                           border: OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(Icons.history, color: Colors.green),
+                            tooltip: "View recent customers",
+                            onPressed: _showRecentCustomersBottomSheet,
+                          ),
                         ),
                         inputFormatters: [
                           LengthLimitingTextInputFormatter(10),
@@ -225,11 +247,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
                         onChanged: (value) {
                           fetchCustomerByMobile(value);
                         },
-                        validator:
-                            (value) =>
-                                value == null || value.isEmpty
-                                    ? 'Required'
-                                    : null,
+                        validator: (value) =>
+                            value == null || value.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -239,30 +258,26 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           labelText: 'Address',
                           border: OutlineInputBorder(),
                         ),
-                        validator:
-                            (value) =>
-                                value == null || value.isEmpty
-                                    ? 'Required'
-                                    : null,
+                        validator: (value) =>
+                            value == null || value.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: isLoading ? null : _submitForm,
-                          icon:
-                              isLoading
-                                  ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
+                          icon: isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
                                     ),
-                                  )
-                                  : const Icon(Icons.arrow_forward),
+                                  ),
+                                )
+                              : const Icon(Icons.arrow_forward),
                           label: Text(
                             isLoading
                                 ? 'Please wait...'
@@ -283,6 +298,185 @@ class _UserFormScreenState extends State<UserFormScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _showRecentCustomersBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return FutureBuilder<List<Order>>(
+          future: _fetchRecentOrders(), // Fetch on open
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _buildBottomSheetContent(
+                child: const Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              );
+            } else if (snapshot.hasError) {
+              return _buildBottomSheetContent(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.error_outline, color: Colors.red, size: 40),
+                      SizedBox(height: 10),
+                      Text("Failed to load recent customers"),
+                    ],
+                  ),
+                ),
+              );
+            } else if (snapshot.data == null || snapshot.data!.isEmpty) {
+              return _buildBottomSheetContent(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.people_outline, color: Colors.grey, size: 40),
+                      SizedBox(height: 10),
+                      Text("No recent customers found"),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            final orders = snapshot.data!;
+            return _buildBottomSheetContent(
+              child: Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    final customer = orders[index];
+                    return Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          _nameController.text = customer.orderUsername;
+                          _numberController.text = customer.orderMobileNo;
+                          _addressController.text = customer.orderAddress;
+                          Navigator.pop(context);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Name & Amount
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      customer.orderUsername,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    "₹${customer.totalAmount}",
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+
+                              // Phone
+                              Row(
+                                children: [
+                                  const Icon(Icons.phone,
+                                      size: 14, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    customer.orderMobileNo,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+
+                              // Address
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.location_on,
+                                      size: 14, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      customer.orderAddress,
+                                      style: const TextStyle(fontSize: 13),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildBottomSheetContent({required Widget child}) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            "Recent Customers",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.green,
+            ),
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
       ),
     );
   }
