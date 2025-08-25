@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/TotalOrderReport.dart';
 import '../models/order.dart';
 import '../models/order_model.dart';
 import '../models/user.dart';
@@ -27,12 +28,34 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
   bool isLoading = false;
 
+  TotalOrderReport? report;
+  bool isDashboardLoading = false;
+  String selectedFilter = "Today";
+  DateTimeRange? customRange;
+
   @override
   void initState() {
     super.initState();
     _apiService = ApiService(context);
     Provider.of<AppProvider>(context, listen: false).clearCart();
     _initFcmToken();
+
+    // Default filter = Today
+    selectedFilter = "Today";
+    _applyFilter();
+  }
+
+  void _loadData(String startDate, String endDate) async {
+    setState(() {
+      isDashboardLoading = true;
+    });
+
+    final data = await _apiService.fetchTotalOrderReport(startDate, endDate);
+
+    setState(() {
+      report = data;
+      isDashboardLoading = false;
+    });
   }
 
   Future<String> getDeviceId() async {
@@ -184,9 +207,158 @@ class _UserFormScreenState extends State<UserFormScreen> {
     }
   }
 
+  void _applyFilter() {
+    final today = DateTime.now();
+
+    String startDate = "";
+    String endDate = "";
+
+    if (selectedFilter == "Today") {
+      startDate = _formatDate(today);
+      endDate = _formatDate(today);
+    } else if (selectedFilter == "This Month") {
+      final firstDay = DateTime(today.year, today.month, 1);
+      final lastDay = DateTime(today.year, today.month + 1, 0);
+      startDate = _formatDate(firstDay);
+      endDate = _formatDate(lastDay);
+    } else if (selectedFilter == "Lifetime") {
+      startDate = "2000-01-01"; // or your system’s start date
+      endDate = _formatDate(today);
+    } else if (selectedFilter == "Custom" && customRange != null) {
+      startDate = _formatDate(customRange!.start);
+      endDate = _formatDate(customRange!.end);
+    }
+
+    _loadData(startDate, endDate);
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white, // white background
+        elevation: 0, // optional: remove shadow for a clean look
+        title: Row(
+          children: [
+            Image.asset(
+              "assets/logo_min.png",
+              height: 32,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              "Bilipatra Retail Counter",
+              style: TextStyle(
+                color: Colors.green, // green text
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        iconTheme:
+            const IconThemeData(color: Colors.green), // for menu/drawer icon
+      ),
+      endDrawer: Drawer(
+        backgroundColor: Colors.green.shade50, // lightest green background
+        child: SafeArea(
+          child: isDashboardLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Dashboard",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          ChoiceChip(
+                            label: const Text("Today"),
+                            selected: selectedFilter == "Today",
+                            onSelected: (_) {
+                              setState(() => selectedFilter = "Today");
+                              _applyFilter();
+                            },
+                          ),
+                          ChoiceChip(
+                            label: const Text("This Month"),
+                            selected: selectedFilter == "This Month",
+                            onSelected: (_) {
+                              setState(() => selectedFilter = "This Month");
+                              _applyFilter();
+                            },
+                          ),
+                          ChoiceChip(
+                            label: const Text("Lifetime"),
+                            selected: selectedFilter == "Lifetime",
+                            onSelected: (_) {
+                              setState(() => selectedFilter = "Lifetime");
+                              _applyFilter();
+                            },
+                          ),
+                          ChoiceChip(
+                            label: const Text("Custom"),
+                            selected: selectedFilter == "Custom",
+                            onSelected: (_) async {
+                              final picked = await showDateRangePicker(
+                                context: context,
+                                firstDate: DateTime(2022, 1, 1),
+                                lastDate: DateTime.now(),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  selectedFilter = "Custom";
+                                  customRange = picked;
+                                });
+                                _applyFilter();
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _buildStatCard(
+                        title: "Total Orders",
+                        value: "${report?.totalOrder ?? 0}",
+                        icon: Icons.shopping_cart,
+                        color: Colors.orange,
+                      ),
+                      _buildStatCard(
+                        title: "Total Amount",
+                        value: "₹ ${report?.totalAmount ?? '0'}",
+                        icon: Icons.attach_money,
+                        color: Colors.green,
+                      ),
+                      _buildStatCard(
+                        title: "Cash Orders",
+                        value:
+                            "${report?.cashOrderCount ?? 0} (₹ ${report?.cashAmount ?? '0'})",
+                        icon: Icons.payments,
+                        color: Colors.blue,
+                      ),
+                      _buildStatCard(
+                        title: "Online Orders",
+                        value:
+                            "${report?.onlineOrderCount ?? 0} (₹ ${report?.onlineAmount ?? '0'})",
+                        icon: Icons.credit_card,
+                        color: Colors.purple,
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth > 700;
@@ -233,9 +405,10 @@ class _UserFormScreenState extends State<UserFormScreen> {
                         keyboardType: TextInputType.phone,
                         decoration: InputDecoration(
                           labelText: 'Phone Number',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
-                            icon: Icon(Icons.history, color: Colors.green),
+                            icon:
+                                const Icon(Icons.history, color: Colors.green),
                             tooltip: "View recent customers",
                             onPressed: _showRecentCustomersBottomSheet,
                           ),
@@ -298,6 +471,46 @@ class _UserFormScreenState extends State<UserFormScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+// Custom widget for statistic card
+  Widget _buildStatCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: color.withOpacity(0.1),
+              child: Icon(icon, color: color),
+            ),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                Text(value,
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: color)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

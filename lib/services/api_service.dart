@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 
+import '../models/TotalOrderReport.dart';
 import '../models/common_response.dart';
 import '../models/product.dart';
 import '../utils/logger.dart';
@@ -408,6 +409,17 @@ class ApiService {
     } else {
       throw Exception('Failed to load products: ${response['message']}');
     }
+  }
+
+  Future<TotalOrderReport?> fetchTotalOrderReport(String start_date, String end_date) async {
+    final response = await _postRequest("retailcounter_order/v1/TotalOrderReport", {
+      'start_date': start_date,
+      'end_date': end_date
+    });
+    if (response['flag'] == 1 && response['code'] == 200) {
+      return TotalOrderReport.fromJson(response);
+      }
+      return null;
   }
 
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> data) async {
