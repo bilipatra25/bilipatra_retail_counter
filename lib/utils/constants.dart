@@ -22,3 +22,10 @@ extension OrderTypeExtension on OrderType {
     return toString().split('.').last;
   }
 }
+enum DateFilter {
+  today,
+  yesterday,
+  thisMonth,
+  lifetime,
+  custom,
+}

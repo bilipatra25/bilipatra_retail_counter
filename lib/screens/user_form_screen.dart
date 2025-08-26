@@ -11,6 +11,7 @@ import '../models/order.dart';
 import '../models/order_model.dart';
 import '../models/user.dart';
 import '../providers/app_provider.dart';
+import '../utils/constants.dart';
 
 class UserFormScreen extends StatefulWidget {
   const UserFormScreen({super.key});
@@ -30,8 +31,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
   TotalOrderReport? report;
   bool isDashboardLoading = false;
-  String selectedFilter = "Today";
   DateTimeRange? customRange;
+  DateFilter _selectedFilter = DateFilter.today;
 
   @override
   void initState() {
@@ -39,10 +40,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _apiService = ApiService(context);
     Provider.of<AppProvider>(context, listen: false).clearCart();
     _initFcmToken();
-
-    // Default filter = Today
-    selectedFilter = "Today";
-    _applyFilter();
+    _applyFilter(_selectedFilter);
   }
 
   void _loadData(String startDate, String endDate) async {
@@ -207,33 +205,75 @@ class _UserFormScreenState extends State<UserFormScreen> {
     }
   }
 
-  void _applyFilter() {
-    final today = DateTime.now();
+  void _applyFilter(DateFilter filter) async {
+    setState(() {
+      _selectedFilter = filter;
+      isDashboardLoading = true;
+    });
 
+    final today = DateTime.now();
     String startDate = "";
     String endDate = "";
 
-    if (selectedFilter == "Today") {
-      startDate = _formatDate(today);
-      endDate = _formatDate(today);
-    } else if (selectedFilter == "This Month") {
-      final firstDay = DateTime(today.year, today.month, 1);
-      final lastDay = DateTime(today.year, today.month + 1, 0);
-      startDate = _formatDate(firstDay);
-      endDate = _formatDate(lastDay);
-    } else if (selectedFilter == "Lifetime") {
-      startDate = "2000-01-01"; // or your system’s start date
-      endDate = _formatDate(today);
-    } else if (selectedFilter == "Custom" && customRange != null) {
-      startDate = _formatDate(customRange!.start);
-      endDate = _formatDate(customRange!.end);
+    switch (filter) {
+      case DateFilter.today:
+        startDate = endDate =
+        "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+        break;
+
+      case DateFilter.yesterday:
+        final yesterday = today.subtract(const Duration(days: 1));
+        startDate = endDate =
+        "${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}";
+        break;
+
+      case DateFilter.thisMonth:
+        startDate = "${today.year}-${today.month.toString().padLeft(2, '0')}-01";
+        endDate =
+        "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+        break;
+
+      case DateFilter.lifetime:
+      // earliest possible start date
+        startDate = "2000-01-01";
+        endDate =
+        "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+        break;
+
+      case DateFilter.custom:
+        final picked = await showDateRangePicker(
+          context: context,
+          firstDate: DateTime(2000),
+          lastDate: DateTime.now(),
+          initialDateRange: DateTimeRange(
+            start: today.subtract(const Duration(days: 7)),
+            end: today,
+          ),
+        );
+
+        if (picked != null) {
+          startDate =
+          "${picked.start.year}-${picked.start.month.toString().padLeft(2, '0')}-${picked.start.day.toString().padLeft(2, '0')}";
+          endDate =
+          "${picked.end.year}-${picked.end.month.toString().padLeft(2, '0')}-${picked.end.day.toString().padLeft(2, '0')}";
+        } else {
+          setState(() {
+            isDashboardLoading = false; // cancel custom selection
+          });
+          return;
+        }
+        break;
     }
 
-    _loadData(startDate, endDate);
+    _fetchReport(startDate, endDate);
   }
 
-  String _formatDate(DateTime date) {
-    return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+  Future<void> _fetchReport(String start, String end) async {
+    final data = await _apiService.fetchTotalOrderReport(start, end);
+    setState(() {
+      report = data;
+      isDashboardLoading = false;
+    });
   }
 
   @override
@@ -282,51 +322,34 @@ class _UserFormScreenState extends State<UserFormScreen> {
                       const SizedBox(height: 16),
                       Wrap(
                         spacing: 8,
-                        children: [
-                          ChoiceChip(
-                            label: const Text("Today"),
-                            selected: selectedFilter == "Today",
-                            onSelected: (_) {
-                              setState(() => selectedFilter = "Today");
-                              _applyFilter();
-                            },
-                          ),
-                          ChoiceChip(
-                            label: const Text("This Month"),
-                            selected: selectedFilter == "This Month",
-                            onSelected: (_) {
-                              setState(() => selectedFilter = "This Month");
-                              _applyFilter();
-                            },
-                          ),
-                          ChoiceChip(
-                            label: const Text("Lifetime"),
-                            selected: selectedFilter == "Lifetime",
-                            onSelected: (_) {
-                              setState(() => selectedFilter = "Lifetime");
-                              _applyFilter();
-                            },
-                          ),
-                          ChoiceChip(
-                            label: const Text("Custom"),
-                            selected: selectedFilter == "Custom",
-                            onSelected: (_) async {
-                              final picked = await showDateRangePicker(
-                                context: context,
-                                firstDate: DateTime(2022, 1, 1),
-                                lastDate: DateTime.now(),
-                              );
-                              if (picked != null) {
-                                setState(() {
-                                  selectedFilter = "Custom";
-                                  customRange = picked;
-                                });
-                                _applyFilter();
-                              }
-                            },
-                          ),
-                        ],
-                      ),
+                children: [
+                  ChoiceChip(
+                    label: const Text("Today"),
+                    selected: _selectedFilter == DateFilter.today,
+                    onSelected: (_) => _applyFilter(DateFilter.today),
+                  ),
+                  ChoiceChip(
+                    label: const Text("Yesterday"),
+                    selected: _selectedFilter == DateFilter.yesterday,
+                    onSelected: (_) => _applyFilter(DateFilter.yesterday),
+                  ),
+                  ChoiceChip(
+                    label: const Text("This Month"),
+                    selected: _selectedFilter == DateFilter.thisMonth,
+                    onSelected: (_) => _applyFilter(DateFilter.thisMonth),
+                  ),
+                  ChoiceChip(
+                    label: const Text("Lifetime"),
+                    selected: _selectedFilter == DateFilter.lifetime,
+                    onSelected: (_) => _applyFilter(DateFilter.lifetime),
+                  ),
+                  ChoiceChip(
+                    label: const Text("Custom"),
+                    selected: _selectedFilter == DateFilter.custom,
+                    onSelected: (_) => _applyFilter(DateFilter.custom),
+                  ),
+                ],
+              ),
                       const SizedBox(height: 16),
                       _buildStatCard(
                         title: "Total Orders",
