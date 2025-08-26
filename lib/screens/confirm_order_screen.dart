@@ -17,7 +17,8 @@ class ConfirmOrderScreen extends StatefulWidget {
 class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
   bool _isLoading = false;
   OrderType _selectedOrderType = OrderType.cash;
-
+  double discountPercent = 0.0;
+  final TextEditingController _discountController = TextEditingController();
   Future<void> _placeOrder(user, products) async {
     setState(() => _isLoading = true);
 
@@ -92,12 +93,17 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
           (sum, item) => sum + (item.price * item.quantity),
     );
 
-// Assuming 5% GST included in subtotal
-    double gstRate = 0.05;
-    double gstAmount = subtotal * gstRate / (1 + gstRate); // Back-calculating GST
-    double baseAmount = subtotal - gstAmount; // Amount before GST
-    double total = subtotal; // Total remains same since GST is included
+    // Apply discount BEFORE GST
+    double discountAmount = subtotal * (discountPercent / 100);
+    double discountedSubtotal = subtotal - discountAmount;
 
+    // GST
+    double gstRate = 0.05;
+    double gstAmount = discountedSubtotal * gstRate / (1 + gstRate);
+    double baseAmount = discountedSubtotal - gstAmount;
+
+    // Final total
+    double total = discountedSubtotal;
 
     return Scaffold(
       appBar: AppBar(
@@ -171,6 +177,10 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             separatorBuilder: (_, __) => const Divider(),
                             itemBuilder: (context, index) {
                               final item = products[index];
+                              final originalPrice = item.price * item.quantity;
+                              final discountedPrice = originalPrice - (originalPrice * (discountPercent / 100));
+                              final hasDiscount = discountPercent > 0;
+
                               return ListTile(
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.green.shade100,
@@ -186,14 +196,63 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                trailing: Text(
-                                  '₹ ${(item.price * item.quantity).toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                trailing: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (hasDiscount) // Show only if discount applied
+                                      Text(
+                                        '₹ ${originalPrice.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          decoration: TextDecoration.lineThrough,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    Text(
+                                      '₹ ${hasDiscount ? discountedPrice.toStringAsFixed(2) : originalPrice.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             },
+                          ),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _discountController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      labelText: "Discount (%)",
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        discountPercent = double.tryParse(val) ?? 0.0;
+                                      });
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  "- ₹ ${discountAmount.toStringAsFixed(2)}",
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 12),
                           const Divider(),
@@ -202,54 +261,43 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             child: Column(
                               children: [
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text(
-                                      'Subtotal:',
-                                      style: TextStyle(fontSize: 16),
-                                    ),
-                                    Text(
-                                      '₹ ${baseAmount.toStringAsFixed(2)}',
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
+                                    const Text("Subtotal:"),
+                                    Text("₹ ${subtotal.toStringAsFixed(2)}"),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text(
-                                      'GST (5%):',
-                                      style: TextStyle(fontSize: 16),
-                                    ),
-                                    Text(
-                                      '₹ ${gstAmount.toStringAsFixed(2)}',
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
+                                    Text("Discount (${discountPercent.toStringAsFixed(1)}%):"),
+                                    Text("- ₹ ${discountAmount.toStringAsFixed(2)}"),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text("Taxable Amount:"),
+                                    Text("₹ ${baseAmount.toStringAsFixed(2)}"),
+                                  ],
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text("GST (5%):"),
+                                    Text("₹ ${gstAmount.toStringAsFixed(2)}"),
+                                  ],
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text(
-                                      'Total:',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green,
-                                      ),
+                                      "Total:",
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
                                     ),
                                     Text(
-                                      '₹ ${total.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green,
-                                      ),
+                                      "₹ $total",
+                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
                                     ),
                                   ],
                                 ),
