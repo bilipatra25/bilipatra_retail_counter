@@ -134,28 +134,29 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Use Existing Customer?'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Name: ${customer['customer_name']}'),
-              Text('Phone: ${customer['mobile_no']}'),
-              Text('Address: ${customer['address']}'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Use Existing Customer?'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Name: ${customer['customer_name']}'),
+                  Text('Phone: ${customer['mobile_no']}'),
+                  Text('Address: ${customer['address']}'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Confirm'),
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
       );
 
       if (confirmed == true) {
@@ -217,27 +218,30 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
     switch (filter) {
       case DateFilter.today:
-        startDate = endDate =
-        "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+        startDate =
+            endDate =
+                "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
         break;
 
       case DateFilter.yesterday:
         final yesterday = today.subtract(const Duration(days: 1));
-        startDate = endDate =
-        "${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}";
+        startDate =
+            endDate =
+                "${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}";
         break;
 
       case DateFilter.thisMonth:
-        startDate = "${today.year}-${today.month.toString().padLeft(2, '0')}-01";
+        startDate =
+            "${today.year}-${today.month.toString().padLeft(2, '0')}-01";
         endDate =
-        "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+            "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
         break;
 
       case DateFilter.lifetime:
-      // earliest possible start date
+        // earliest possible start date
         startDate = "2000-01-01";
         endDate =
-        "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+            "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
         break;
 
       case DateFilter.custom:
@@ -253,9 +257,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
         if (picked != null) {
           startDate =
-          "${picked.start.year}-${picked.start.month.toString().padLeft(2, '0')}-${picked.start.day.toString().padLeft(2, '0')}";
+              "${picked.start.year}-${picked.start.month.toString().padLeft(2, '0')}-${picked.start.day.toString().padLeft(2, '0')}";
           endDate =
-          "${picked.end.year}-${picked.end.month.toString().padLeft(2, '0')}-${picked.end.day.toString().padLeft(2, '0')}";
+              "${picked.end.year}-${picked.end.month.toString().padLeft(2, '0')}-${picked.end.day.toString().padLeft(2, '0')}";
         } else {
           setState(() {
             isDashboardLoading = false; // cancel custom selection
@@ -284,10 +288,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
         elevation: 0, // optional: remove shadow for a clean look
         title: Row(
           children: [
-            Image.asset(
-              "assets/logo_min.png",
-              height: 32,
-            ),
+            Image.asset("assets/logo_min.png", height: 32),
             const SizedBox(width: 8),
             const Text(
               "Bilipatra Retail Counter",
@@ -298,88 +299,94 @@ class _UserFormScreenState extends State<UserFormScreen> {
             ),
           ],
         ),
-        iconTheme:
-            const IconThemeData(color: Colors.green), // for menu/drawer icon
+        iconTheme: const IconThemeData(
+          color: Colors.green,
+        ), // for menu/drawer icon
       ),
       endDrawer: Drawer(
         backgroundColor: Colors.green.shade50, // lightest green background
         child: SafeArea(
-          child: isDashboardLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Dashboard",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
+          child:
+              isDashboardLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Dashboard",
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            ChoiceChip(
+                              label: const Text("Today"),
+                              selected: _selectedFilter == DateFilter.today,
+                              onSelected: (_) => _applyFilter(DateFilter.today),
+                            ),
+                            ChoiceChip(
+                              label: const Text("Yesterday"),
+                              selected: _selectedFilter == DateFilter.yesterday,
+                              onSelected:
+                                  (_) => _applyFilter(DateFilter.yesterday),
+                            ),
+                            ChoiceChip(
+                              label: const Text("This Month"),
+                              selected: _selectedFilter == DateFilter.thisMonth,
+                              onSelected:
+                                  (_) => _applyFilter(DateFilter.thisMonth),
+                            ),
+                            ChoiceChip(
+                              label: const Text("Lifetime"),
+                              selected: _selectedFilter == DateFilter.lifetime,
+                              onSelected:
+                                  (_) => _applyFilter(DateFilter.lifetime),
+                            ),
+                            ChoiceChip(
+                              label: const Text("Custom"),
+                              selected: _selectedFilter == DateFilter.custom,
+                              onSelected:
+                                  (_) => _applyFilter(DateFilter.custom),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildStatCard(
+                          title: "Total Orders",
+                          value: "${report?.totalOrder ?? 0}",
+                          icon: Icons.shopping_cart,
+                          color: Colors.orange,
+                        ),
+                        _buildStatCard(
+                          title: "Total Amount",
+                          value: "₹ ${report?.totalAmount ?? '0'}",
+                          icon: Icons.attach_money,
                           color: Colors.green,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: const Text("Today"),
-                    selected: _selectedFilter == DateFilter.today,
-                    onSelected: (_) => _applyFilter(DateFilter.today),
+                        _buildStatCard(
+                          title: "Cash Orders",
+                          value:
+                              "${report?.cashOrderCount ?? 0} (₹ ${report?.cashAmount ?? '0'})",
+                          icon: Icons.payments,
+                          color: Colors.blue,
+                        ),
+                        _buildStatCard(
+                          title: "Online Orders",
+                          value:
+                              "${report?.onlineOrderCount ?? 0} (₹ ${report?.onlineAmount ?? '0'})",
+                          icon: Icons.credit_card,
+                          color: Colors.purple,
+                        ),
+                      ],
+                    ),
                   ),
-                  ChoiceChip(
-                    label: const Text("Yesterday"),
-                    selected: _selectedFilter == DateFilter.yesterday,
-                    onSelected: (_) => _applyFilter(DateFilter.yesterday),
-                  ),
-                  ChoiceChip(
-                    label: const Text("This Month"),
-                    selected: _selectedFilter == DateFilter.thisMonth,
-                    onSelected: (_) => _applyFilter(DateFilter.thisMonth),
-                  ),
-                  ChoiceChip(
-                    label: const Text("Lifetime"),
-                    selected: _selectedFilter == DateFilter.lifetime,
-                    onSelected: (_) => _applyFilter(DateFilter.lifetime),
-                  ),
-                  ChoiceChip(
-                    label: const Text("Custom"),
-                    selected: _selectedFilter == DateFilter.custom,
-                    onSelected: (_) => _applyFilter(DateFilter.custom),
-                  ),
-                ],
-              ),
-                      const SizedBox(height: 16),
-                      _buildStatCard(
-                        title: "Total Orders",
-                        value: "${report?.totalOrder ?? 0}",
-                        icon: Icons.shopping_cart,
-                        color: Colors.orange,
-                      ),
-                      _buildStatCard(
-                        title: "Total Amount",
-                        value: "₹ ${report?.totalAmount ?? '0'}",
-                        icon: Icons.attach_money,
-                        color: Colors.green,
-                      ),
-                      _buildStatCard(
-                        title: "Cash Orders",
-                        value:
-                            "${report?.cashOrderCount ?? 0} (₹ ${report?.cashAmount ?? '0'})",
-                        icon: Icons.payments,
-                        color: Colors.blue,
-                      ),
-                      _buildStatCard(
-                        title: "Online Orders",
-                        value:
-                            "${report?.onlineOrderCount ?? 0} (₹ ${report?.onlineAmount ?? '0'})",
-                        icon: Icons.credit_card,
-                        color: Colors.purple,
-                      ),
-                    ],
-                  ),
-                ),
         ),
       ),
       body: LayoutBuilder(
@@ -419,8 +426,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           labelText: 'Full Name',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) =>
-                            value == null || value.isEmpty ? 'Required' : null,
+                        validator:
+                            (value) =>
+                                value == null || value.isEmpty
+                                    ? 'Required'
+                                    : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -430,8 +440,10 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           labelText: 'Phone Number',
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
-                            icon:
-                                const Icon(Icons.history, color: Colors.green),
+                            icon: const Icon(
+                              Icons.history,
+                              color: Colors.green,
+                            ),
                             tooltip: "View recent customers",
                             onPressed: _showRecentCustomersBottomSheet,
                           ),
@@ -443,8 +455,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
                         onChanged: (value) {
                           fetchCustomerByMobile(value);
                         },
-                        validator: (value) =>
-                            value == null || value.isEmpty ? 'Required' : null,
+                        validator:
+                            (value) =>
+                                value == null || value.isEmpty
+                                    ? 'Required'
+                                    : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -454,26 +469,30 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           labelText: 'Address',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) =>
-                            value == null || value.isEmpty ? 'Required' : null,
+                        validator:
+                            (value) =>
+                                value == null || value.isEmpty
+                                    ? 'Required'
+                                    : null,
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: isLoading ? null : _submitForm,
-                          icon: isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
+                          icon:
+                              isLoading
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
-                                  ),
-                                )
-                              : const Icon(Icons.arrow_forward),
+                                  )
+                                  : const Icon(Icons.arrow_forward),
                           label: Text(
                             isLoading
                                 ? 'Please wait...'
@@ -498,7 +517,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     );
   }
 
-// Custom widget for statistic card
+  // Custom widget for statistic card
   Widget _buildStatCard({
     required String title,
     required String value,
@@ -521,15 +540,22 @@ class _UserFormScreenState extends State<UserFormScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w500)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(value,
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: color)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
               ],
             ),
           ],
@@ -643,8 +669,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
                               // Phone
                               Row(
                                 children: [
-                                  const Icon(Icons.phone,
-                                      size: 14, color: Colors.grey),
+                                  const Icon(
+                                    Icons.phone,
+                                    size: 14,
+                                    color: Colors.grey,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     customer.orderMobileNo,
@@ -658,8 +687,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.location_on,
-                                      size: 14, color: Colors.grey),
+                                  const Icon(
+                                    Icons.location_on,
+                                    size: 14,
+                                    color: Colors.grey,
+                                  ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
