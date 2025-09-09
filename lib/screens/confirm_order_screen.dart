@@ -24,16 +24,17 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
 
     try {
       final api = ApiService(context);
-      final List<Map<String, dynamic>> productList = products
-          .map<Map<String, dynamic>>(
-            (p) => {
-              "product_id": p.id,
-              "qty": p.quantity,
-              "unit": "pcs",
-              // "discount": 0,
-            },
-          )
-          .toList();
+      final List<Map<String, dynamic>> productList =
+          products
+              .map<Map<String, dynamic>>(
+                (p) => {
+                  "product_id": p.id,
+                  "qty": p.quantity,
+                  "unit": "pcs",
+                  // "discount": 0,
+                },
+              )
+              .toList();
 
       final data = {
         "order_type": _selectedOrderType.value,
@@ -55,21 +56,15 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
       if (_selectedOrderType == OrderType.cash) {
         context.goNamed(
           'orderSuccess',
-          pathParameters: {
-            'orderId': orderData['order_id'].toString(),
-          },
+          pathParameters: {'orderId': orderData['order_id'].toString()},
         );
       } else if (_selectedOrderType == OrderType.online) {
-        context.goNamed(
+        await context.pushNamed(
           'paymentImage',
           extra: {
             'orderId': orderData['order_id'],
             'imageUrl': orderData['image_url'],
           },
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unknown order type selected')),
         );
       }
     } catch (e) {
@@ -90,7 +85,7 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
 
     double subtotal = products.fold(
       0,
-          (sum, item) => sum + (item.price * item.quantity),
+      (sum, item) => sum + (item.price * item.quantity),
     );
 
     // Apply discount BEFORE GST
@@ -178,7 +173,9 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             itemBuilder: (context, index) {
                               final item = products[index];
                               final originalPrice = item.price * item.quantity;
-                              final discountedPrice = originalPrice - (originalPrice * (discountPercent / 100));
+                              final discountedPrice =
+                                  originalPrice -
+                                  (originalPrice * (discountPercent / 100));
                               final hasDiscount = discountPercent > 0;
 
                               return ListTile(
@@ -205,7 +202,8 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                         '₹ ${originalPrice.toStringAsFixed(2)}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w600,
-                                          decoration: TextDecoration.lineThrough,
+                                          decoration:
+                                              TextDecoration.lineThrough,
                                           color: Colors.grey,
                                         ),
                                       ),
@@ -237,7 +235,8 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                     ),
                                     onChanged: (val) {
                                       setState(() {
-                                        discountPercent = double.tryParse(val) ?? 0.0;
+                                        discountPercent =
+                                            double.tryParse(val) ?? 0.0;
                                       });
                                     },
                                   ),
@@ -261,43 +260,58 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             child: Column(
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text("Subtotal:"),
                                     Text("₹ ${subtotal.toStringAsFixed(2)}"),
                                   ],
                                 ),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text("Discount (${discountPercent.toStringAsFixed(1)}%):"),
-                                    Text("- ₹ ${discountAmount.toStringAsFixed(2)}"),
+                                    Text(
+                                      "Discount (${discountPercent.toStringAsFixed(1)}%):",
+                                    ),
+                                    Text(
+                                      "- ₹ ${discountAmount.toStringAsFixed(2)}",
+                                    ),
                                   ],
                                 ),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text("Taxable Amount:"),
                                     Text("₹ ${baseAmount.toStringAsFixed(2)}"),
                                   ],
                                 ),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text("GST (5%):"),
                                     Text("₹ ${gstAmount.toStringAsFixed(2)}"),
                                   ],
                                 ),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text(
                                       "Total:",
-                                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
                                     ),
                                     Text(
                                       "₹ $total",
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -305,8 +319,10 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             ),
                           ),
                           Padding(
-                            padding:
-                                const EdgeInsets.only(bottom: 12.0, top: 6),
+                            padding: const EdgeInsets.only(
+                              bottom: 12.0,
+                              top: 6,
+                            ),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -315,13 +331,16 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(12),
-                                border:
-                                    Border.all(color: Colors.green.shade200),
+                                border: Border.all(
+                                  color: Colors.green.shade200,
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.payment,
-                                      color: Colors.green),
+                                  const Icon(
+                                    Icons.payment,
+                                    color: Colors.green,
+                                  ),
                                   const SizedBox(width: 10),
                                   const Text(
                                     "Payment Type:",
@@ -353,13 +372,17 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                             });
                                           }
                                         },
-                                        items: OrderType.values
-                                            .map((OrderType type) {
-                                          return DropdownMenuItem<OrderType>(
-                                            value: type,
-                                            child: Text(type.label),
-                                          );
-                                        }).toList(),
+                                        items:
+                                            OrderType.values.map((
+                                              OrderType type,
+                                            ) {
+                                              return DropdownMenuItem<
+                                                OrderType
+                                              >(
+                                                value: type,
+                                                child: Text(type.label),
+                                              );
+                                            }).toList(),
                                       ),
                                     ),
                                   ),
@@ -376,39 +399,49 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _isLoading
-                              ? null
-                              : () async {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      title: const Text("Place Order?"),
-                                      content: const Text(
-                                        "Do you want to place this order?",
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(
-                                            context,
-                                            false,
-                                          ),
-                                          child: const Text("Cancel"),
-                                        ),
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(
-                                            context,
-                                            true,
-                                          ),
-                                          child: const Text("Confirm"),
-                                        ),
-                                      ],
-                                    ),
-                                  );
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () async {
+                                    if (_selectedOrderType == OrderType.cash) {
+                                      // Show confirmation dialog only for cash orders
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder:
+                                            (_) => AlertDialog(
+                                              title: const Text("Place Order?"),
+                                              content: const Text(
+                                                "Do you want to place this order?",
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed:
+                                                      () => Navigator.pop(
+                                                        context,
+                                                        false,
+                                                      ),
+                                                  child: const Text("Cancel"),
+                                                ),
+                                                TextButton(
+                                                  onPressed:
+                                                      () => Navigator.pop(
+                                                        context,
+                                                        true,
+                                                      ),
+                                                  child: const Text("Confirm"),
+                                                ),
+                                              ],
+                                            ),
+                                      );
 
-                                  if (confirm ?? false) {
-                                    await _placeOrder(user, products);
-                                  }
-                                },
+                                      if (confirm ?? false) {
+                                        await _placeOrder(user, products);
+                                      }
+                                    } else {
+                                      // Directly place order or redirect for other order types
+                                      await _placeOrder(user, products);
+                                    }
+                                  },
                           icon: const Icon(Icons.shopping_bag),
                           label: Text(
                             _isLoading ? "Placing Order..." : "Place Order",
