@@ -7,6 +7,7 @@ import '../PrintScreen.dart';
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
 import '../services/api_service.dart';
+import 'invoice_webview_screen.dart';
 
 class OrderSuccessScreen extends StatefulWidget {
   final int orderId;
@@ -32,9 +33,9 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
       final api = ApiService(context);
       final res = await api.orderListById(widget.orderId.toString());
 
-      if (res['flag'] == 1 && res['data'] != null && res['data'].isNotEmpty) {
+      if (res['flag'] == 1 && res['data'] != null) {
         setState(() {
-          order = OrderModelResponse.fromJson(res['data'][0]);
+          order = OrderModelResponse.fromJson(res['data']);
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -108,128 +109,222 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
   Widget _buildOrderSummary(BuildContext context) {
     if (order == null) return const Text("Order not found");
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Text(
-              "Invoice",
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: ListTile(
-              title: Text("Customer: ${order!.customerName}"),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Mobile: ${order!.mobileNo}"),
-                  Text("Address: ${order!.address}"),
-                  Text("Payment Mode: ${order!.orderType.toUpperCase()}"),
-                ],
-              ),
-            ),
-          ),
-          const Text(
-            "Items",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Table(
-            columnWidths: const {
-              0: FlexColumnWidth(4),
-              1: FlexColumnWidth(2),
-              2: FlexColumnWidth(2),
-              3: FlexColumnWidth(2),
-            },
-            border: TableBorder.all(color: Colors.grey.shade300),
-            children: [
-              TableRow(
-                decoration: BoxDecoration(color: Colors.grey.shade200),
-                children: const [
-                  Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Text(
-                      "Product",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Text(
-                      "Qty",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Text(
-                      "Rate",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Text(
-                      "Amount",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              ...order!.productList.map((p) {
-                return TableRow(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("${p.name} (${p.weight})"),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("${p.qty} ${p.unit}"),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("₹${p.price.toStringAsFixed(2)}"),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("₹${p.netAmount.toStringAsFixed(2)}"),
-                    ),
-                  ],
-                );
-              }).toList(),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Align(
-            alignment: Alignment.centerRight,
+    return Column(
+      children: [
+        Expanded(
+          child: DefaultTabController(
+            length: 2,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text("Subtotal: ₹${(order!.subTotal).toStringAsFixed(2)}"),
-                Text("GST: ₹${order!.gstAmount.toStringAsFixed(2)}"),
-                Text("Discount: ₹${order!.totalDiscount.toStringAsFixed(2)}"),
-                const Divider(thickness: 1),
-                Text(
-                  "Total: ₹${order!.totalAmount.toStringAsFixed(2)}",
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                Container(
+                  color: Colors.grey.shade200,
+                  child: const TabBar(
+                    labelColor: Colors.black,
+                    indicatorColor: Colors.green,
+                    tabs: [Tab(text: "Summary"), Tab(text: "Invoice")],
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      // 🔹 Order Summary Tab
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Center(
+                              child: Text(
+                                "Invoice",
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              child: ListTile(
+                                title: Text("Customer: ${order!.customerName}"),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text("Mobile: ${order!.mobileNo}"),
+                                    Text("Address: ${order!.address}"),
+                                    Text(
+                                      "Payment Mode: ${order!.orderType.toUpperCase()}",
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const Text(
+                              "Items",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Table(
+                              columnWidths: const {
+                                0: FlexColumnWidth(3), // Product
+                                1: FlexColumnWidth(2), // Qty
+                                2: FlexColumnWidth(2), // Rate
+                                3: FlexColumnWidth(2), // GST
+                                4: FlexColumnWidth(2), // Final Amount
+                              },
+                              border: TableBorder.all(
+                                color: Colors.grey.shade300,
+                              ),
+                              children: [
+                                // 🔹 Header Row
+                                TableRow(
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                  ),
+                                  children: const [
+                                    Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Text(
+                                        "Product",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Text(
+                                        "Qty",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Text(
+                                        "Rate",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Text(
+                                        "GST %",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Text(
+                                        "Final Amt",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ), // 🔹 Product Rows
+                                ...order!.productList.map((p) {
+                                  return TableRow(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Text("${p.name} (${p.weight})"),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Text("${p.qty} ${p.unit}"),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Text(
+                                          "₹${p.price.toStringAsFixed(2)}",
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Text(
+                                          "${p.gst.toStringAsFixed(2)}",
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Text(
+                                          "₹${p.finalAmt.toStringAsFixed(2)}",
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    "Subtotal: ₹${order!.subTotal.toStringAsFixed(2)}",
+                                  ),
+                                  Text(
+                                    "SGST(2.5%): ₹${order!.sgst.toStringAsFixed(2)}",
+                                  ),
+                                  Text(
+                                    "CGST(2.5%): ₹${order!.cgst.toStringAsFixed(2)}",
+                                  ),
+                                  Text(
+                                    "Discount: ₹${order!.discount.toStringAsFixed(2)}",
+                                  ),
+                                  const Divider(thickness: 1),
+                                  Text(
+                                    "Total: ₹${order!.total.toStringAsFixed(2)}",
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  Text(
+                                    "Received: ₹${order!.received.toStringAsFixed(2)}",
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.blueGrey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 30),
+                          ],
+                        ),
+                      ),
+
+                      // 🔹 Invoice WebView Tab
+                      InvoiceWebViewScreen(
+                        url:
+                            "${ApiService.baseUrl}/invoice/internal-invoice-preview?order_id=${widget.orderId.toString()}",
+                        // or widget default URL
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 30),
-          Row(
+        ),
+
+        // 🔹 Bottom buttons
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
@@ -244,40 +339,28 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                       isScrollControlled: true,
                       backgroundColor: Colors.white,
                       shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                      ),
-                      builder: (context) => Padding(
-                        padding: EdgeInsets.only(
-                          bottom: MediaQuery.of(context).viewInsets.bottom,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(20),
                         ),
-                        child: Wrap(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                              child: PrintScreen(user: user, order: order!),
+                      ),
+                      builder:
+                          (context) => Padding(
+                            padding: EdgeInsets.only(
+                              bottom: MediaQuery.of(context).viewInsets.bottom,
                             ),
-                          ],
-                        ),
-                      ),
+                            child: Wrap(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 20,
+                                  ),
+                                  child: PrintScreen(user: user, order: order!),
+                                ),
+                              ],
+                            ),
+                          ),
                     );
-
-
-  /*                  showDialog(
-                      context: context,
-                      builder: (_) => Dialog.fullscreen(
-                        child: PrintScreen(user: user, order: order!),
-                      ),
-                    );*/
-
-/*
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PrintScreen(user: user, order: order!),
-                        fullscreenDialog: true,
-                      ),
-                    );*/
-
                   },
                   icon: const Icon(Icons.print),
                   label: const Text("Print Invoice"),
@@ -314,9 +397,8 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -347,120 +429,4 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
         ) ??
         false; // default to false if null
   }
-
-  /*
-  Widget _buildOrderSummary() {
-    final userName = orderData?['customer_name'] ?? '-';
-    final phone = orderData?['mobile_no'] ?? '-';
-    final address = orderData?['address'] ?? '-';
-    final total = orderData?['total_amount'] ?? '0';
-    final products = orderData?['product_list'] ?? [];
-
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_circle_outline, size: 60, color: Colors.green),
-          const SizedBox(height: 16),
-          Text(
-            "Your order has been placed successfully!",
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          Text("Order ID: #${widget.orderId}"),
-          const SizedBox(height: 20),
-
-          Card(
-            child: ListTile(
-              title: Text("Customer: $userName"),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [Text("Phone: $phone"), Text("Address: $address")],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-          const Text(
-            "Products:",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-
-          ...products.map<Widget>((item) {
-            return ListTile(
-              title: Text(
-                "${item['product_name']} (${item['product_weight']})",
-              ),
-              subtitle: Text("Qty: ${item['qty']} × ₹${item['price']}"),
-              trailing: Text(
-                "₹${(item['qty'] * item['price']).toStringAsFixed(2)}",
-              ),
-            );
-          }).toList(),
-
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              "Total: ₹$total",
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () => context.go('/'),
-            icon: const Icon(Icons.arrow_back),
-            label: const Text("Back to Home"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey.shade700,
-              foregroundColor: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () {
-              final appProvider = Provider.of<AppProvider>(context, listen: false);
-              final user = appProvider.user;
-              // final products = appProvider.selectedProducts;
-              // TODO: Pass actual user and product list to PrintScreen
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PrintScreen(user: user, products: products),
-                ),
-              );
-            },
-            icon: const Icon(Icons.print),
-            label: const Text("Print Invoice"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black87,
-              foregroundColor: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          ElevatedButton.icon(
-            onPressed: () async {
-              // TODO: Add WhatsApp sharing logic
-            },
-            icon: const Icon(Icons.share),
-            label: const Text("Send via WhatsApp"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }*/
 }

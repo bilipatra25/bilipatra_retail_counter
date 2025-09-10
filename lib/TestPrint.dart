@@ -184,7 +184,6 @@ class TestPrint {
 
     final now = DateTime.now();
     final formattedDate = DateFormat('dd-MM-yyyy HH:mm').format(now);
-    final invoiceId = "#${order.orderId}";
 
     ByteData bytesAsset = await rootBundle.load("assets/logo_min_gr.png");
     Uint8List imageBytesFromAsset = bytesAsset.buffer.asUint8List(
@@ -208,33 +207,29 @@ class TestPrint {
     bluetooth.printCustom("INVOICE", Size.bold.val, Align.center.val);
     bluetooth.printCustom("--------------------------------", Size.medium.val, Align.center.val);
 
-    bluetooth.printLeftRight("Invoice ID", invoiceId, Size.medium.val);
+    bluetooth.printLeftRight("Invoice No", order.invoiceNumber, Size.medium.val);
     bluetooth.printLeftRight("Payment Mode", order.orderType.toUpperCase(), Size.medium.val);
-    bluetooth.printLeftRight("Date", formattedDate, Size.medium.val);
-    bluetooth.printLeftRight("Customer", user.name ?? "-", Size.medium.val);
-    bluetooth.printLeftRight("Phone", user.number ?? "-", Size.medium.val);
-// 🟨 Multiline Address Handling
-    bluetooth.printCustom("Address:", Size.medium.val, Align.center.val);
+    bluetooth.printLeftRight("Date", order.invoiceDate, Size.medium.val);
+    bluetooth.printLeftRight("Customer", order.customerName, Size.medium.val);
+    bluetooth.printLeftRight("Phone", order.mobileNo, Size.medium.val);
 
-    final int maxLineLength = 42; // or set dynamically
-    final address = user.address ?? "-";
-
-// Wrap long address manually
-    List<String> addressLines = _wrapText(address, maxLineLength);
-
+    // 🟨 Multiline Address
+    bluetooth.printCustom("Address:", Size.medium.val, Align.left.val);
+    final int maxLineLength = 42;
+    List<String> addressLines = _wrapText(order.address, maxLineLength);
     for (var line in addressLines) {
-      bluetooth.printCustom(line, Size.medium.val, Align.center.val);
+      bluetooth.printCustom(line, Size.medium.val, Align.left.val);
     }
+
     bluetooth.printNewLine();
-    // int maxLineLength = 42;
+
+    // Table Header
     int qtyColWidth = 6;
     int amtColWidth = 10;
     int nameColWidth = maxLineLength - qtyColWidth - amtColWidth;
 
     bluetooth.printCustom("Item              Qty     Amount", Size.bold.val, Align.left.val);
-
     bluetooth.printCustom("-" * maxLineLength, Size.medium.val, Align.left.val);
-
 
     // Print Item Rows
     for (var item in order.productList) {
@@ -246,14 +241,11 @@ class TestPrint {
           String namePart = lines[i].padRight(nameColWidth);
           String qtyPart = "x${item.qty}".padRight(qtyColWidth);
           String amtPart = "Rs.${item.netAmount.toStringAsFixed(2)}".padLeft(amtColWidth);
-
           bluetooth.printCustom(namePart + qtyPart + amtPart, Size.medium.val, Align.left.val);
         } else {
-          // For wrapped item name lines, no qty/amount
           bluetooth.printCustom(lines[i], Size.medium.val, Align.left.val);
         }
       }
-
       await Future.delayed(const Duration(milliseconds: 100));
     }
 
@@ -262,29 +254,29 @@ class TestPrint {
       return left + ' ' * (space > 0 ? space : 0) + right;
     }
 
-    // Print Totals
+    // ✅ Print Totals
     bluetooth.printCustom("-" * maxLineLength, Size.medium.val, Align.left.val);
-    bluetooth.printCustom(formatLeftRight("Subtotal", "Rs.${(order.subTotal).toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
-    bluetooth.printCustom(formatLeftRight("Discount", "-Rs.${order.totalDiscount.toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
-    bluetooth.printCustom(formatLeftRight("GST", "+Rs.${order.gstAmount.toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
+    bluetooth.printCustom(formatLeftRight("Subtotal", "Rs.${order.subTotal.toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
+    bluetooth.printCustom(formatLeftRight("Discount", "-Rs.${order.discount.toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
+    bluetooth.printCustom(formatLeftRight("SGST", "+Rs.${order.sgst.toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
+    bluetooth.printCustom(formatLeftRight("CGST", "+Rs.${order.cgst.toStringAsFixed(2)}", maxLineLength), Size.medium.val, Align.left.val);
     bluetooth.printCustom("-" * maxLineLength, Size.medium.val, Align.left.val);
-    bluetooth.printLeftRight("Total", "Rs. ${order.totalAmount.toStringAsFixed(2)}", Size.bold.val);
-
+    bluetooth.printLeftRight("Total", "Rs. ${order.total.toStringAsFixed(2)}", Size.bold.val);
+    bluetooth.printLeftRight("Received", "Rs. ${order.received.toStringAsFixed(2)}", Size.medium.val);
 
     bluetooth.printNewLine();
     bluetooth.printCustom("Scan below to view digital bill", Size.medium.val, Align.center.val);
     final billUrl = "https://bilipatra.com";
     await bluetooth.printQRcode(billUrl, 200, 200, Align.center.val);
-    await Future.delayed(const Duration(milliseconds: 400)); // increased delay
+    await Future.delayed(const Duration(milliseconds: 400));
 
-// ✅ ENSURE printing finishes before cut
-    await bluetooth.printNewLine();
-    await bluetooth.printCustom("--------------------------------", Size.medium.val, Align.center.val);
-    await bluetooth.printCustom("Thank You for Shopping!", Size.bold.val, Align.center.val);
-    await bluetooth.printCustom("Visit Again!", Size.bold.val, Align.center.val);
-    await bluetooth.printCustom("--------------------------------", Size.medium.val, Align.center.val);
-    await bluetooth.printNewLine();
-    await Future.delayed(const Duration(milliseconds: 300)); // extra buffer time
+    bluetooth.printNewLine();
+    bluetooth.printCustom("--------------------------------", Size.medium.val, Align.center.val);
+    bluetooth.printCustom("Thank You for Shopping!", Size.bold.val, Align.center.val);
+    bluetooth.printCustom("Visit Again!", Size.bold.val, Align.center.val);
+    bluetooth.printCustom("--------------------------------", Size.medium.val, Align.center.val);
+    bluetooth.printNewLine();
+    await Future.delayed(const Duration(milliseconds: 300));
 
     await bluetooth.paperCut();
     await bluetooth.disconnect();

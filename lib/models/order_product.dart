@@ -8,6 +8,8 @@ class OrderProduct {
   final int orderCartItemId;
   final String name;
   final String weight;
+  final double gst;
+  final double finalAmt;
 
   OrderProduct({
     required this.qty,
@@ -19,19 +21,23 @@ class OrderProduct {
     required this.orderCartItemId,
     required this.name,
     required this.weight,
+    required this.gst,
+    required this.finalAmt,
   });
 
   factory OrderProduct.fromJson(Map<String, dynamic> json) {
     return OrderProduct(
       qty: json['qty'] ?? 0,
       unit: json['unit'] ?? '',
-      price: double.tryParse(json['price']?.toString() ?? '') ?? 0.0,
+      price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
       discount: json['discount'] ?? 0,
-      netAmount: double.tryParse(json['net_amount']?.toString() ?? '') ?? 0.0,
+      netAmount: double.tryParse(json['net_amount']?.toString() ?? '0') ?? 0.0,
       productId: json['product_id'] ?? 0,
       orderCartItemId: json['order_cart_item_id'] ?? 0,
       name: json['product_name'] ?? '',
       weight: json['product_weight'] ?? '',
+      gst: double.tryParse(json['gst']?.toString() ?? '0') ?? 0.0,
+      finalAmt: double.tryParse(json['final_amt']?.toString() ?? '0') ?? 0.0,
     );
   }
 }
