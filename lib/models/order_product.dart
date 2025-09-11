@@ -2,7 +2,7 @@ class OrderProduct {
   final int qty;
   final String unit;
   final double price;
-  final int discount;
+  final double discount; // 🔹 changed from int → double
   final double netAmount;
   final int productId;
   final int orderCartItemId;
@@ -27,13 +27,13 @@ class OrderProduct {
 
   factory OrderProduct.fromJson(Map<String, dynamic> json) {
     return OrderProduct(
-      qty: json['qty'] ?? 0,
+      qty: int.tryParse(json['qty']?.toString() ?? '0') ?? 0,
       unit: json['unit'] ?? '',
       price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
-      discount: json['discount'] ?? 0,
+      discount: double.tryParse(json['discount']?.toString() ?? '0') ?? 0.0, // 🔹 safe conversion
       netAmount: double.tryParse(json['net_amount']?.toString() ?? '0') ?? 0.0,
-      productId: json['product_id'] ?? 0,
-      orderCartItemId: json['order_cart_item_id'] ?? 0,
+      productId: int.tryParse(json['product_id']?.toString() ?? '0') ?? 0,
+      orderCartItemId: int.tryParse(json['order_cart_item_id']?.toString() ?? '0') ?? 0,
       name: json['product_name'] ?? '',
       weight: json['product_weight'] ?? '',
       gst: double.tryParse(json['gst']?.toString() ?? '0') ?? 0.0,
