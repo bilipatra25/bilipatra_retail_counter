@@ -38,6 +38,7 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
 
       final data = {
         "order_type": _selectedOrderType.value,
+        "discount_percent":discountPercent,
         // "order_status": "pending",
         // "GST_amount": 0,
         // // or calculate accordingly
