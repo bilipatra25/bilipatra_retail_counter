@@ -240,7 +240,7 @@ class TestPrint {
         if (i == 0) {
           String namePart = lines[i].padRight(nameColWidth);
           String qtyPart = "x${item.qty}".padRight(qtyColWidth);
-          String amtPart = "Rs.${item.netAmount.toStringAsFixed(2)}".padLeft(amtColWidth);
+          String amtPart = "Rs.${item.finalAmt.toStringAsFixed(2)}".padLeft(amtColWidth);
           bluetooth.printCustom(namePart + qtyPart + amtPart, Size.medium.val, Align.left.val);
         } else {
           bluetooth.printCustom(lines[i], Size.medium.val, Align.left.val);
