@@ -132,37 +132,61 @@ class _UserFormScreenState extends State<UserFormScreen> {
         response['data'].isNotEmpty) {
       final customer = response['data'][0];
 
+      // Handle nulls safely
+      final customerName = customer['customer_name'] ?? 'N/A';
+      final customerMobile = customer['mobile_no'] ?? 'N/A';
+      final customerAddress = customer['address'] ?? 'N/A';
+      final totalOrders = customer['total_orders'] ?? 0;
+      final isRepeat = totalOrders > 0;
+
       final confirmed = await showDialog<bool>(
         context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('Use Existing Customer?'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (context) => AlertDialog(
+          title: const Text('Use Existing Customer?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Name: $customerName'),
+              Text('Phone: $customerMobile'),
+              Text('Address: $customerAddress'),
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  Text('Name: ${customer['customer_name']}'),
-                  Text('Phone: ${customer['mobile_no']}'),
-                  Text('Address: ${customer['address']}'),
+                  Text(
+                    isRepeat ? 'Repeat Customer ($totalOrders orders)' : 'New Customer',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: isRepeat ? Colors.red : Colors.green,
+                    ),
+                  ),
+                  if (isRepeat)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: Icon(Icons.star, color: Colors.red, size: 18),
+                    ),
                 ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Confirm'),
-                ),
-              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
             ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
       );
 
       if (confirmed == true) {
         setState(() {
-          _nameController.text = customer['customer_name'];
-          _addressController.text = customer['address'];
+          _nameController.text = customerName;
+          _addressController.text = customerAddress;
         });
       }
     } else {
@@ -171,6 +195,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
       );
     }
   }
+
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
