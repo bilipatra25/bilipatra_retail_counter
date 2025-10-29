@@ -12,6 +12,7 @@ import '../models/order_model.dart';
 import '../models/user.dart';
 import '../providers/app_provider.dart';
 import '../utils/constants.dart';
+import 'PaymentQRPage.dart';
 
 class UserFormScreen extends StatefulWidget {
   const UserFormScreen({super.key});
@@ -141,46 +142,49 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Use Existing Customer?'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Name: $customerName'),
-              Text('Phone: $customerMobile'),
-              Text('Address: $customerAddress'),
-              const SizedBox(height: 8),
-              Row(
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Use Existing Customer?'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    isRepeat ? 'Repeat Customer ($totalOrders orders)' : 'New Customer',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: isRepeat ? Colors.red : Colors.green,
-                    ),
+                  Text('Name: $customerName'),
+                  Text('Phone: $customerMobile'),
+                  Text('Address: $customerAddress'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        isRepeat
+                            ? 'Repeat Customer ($totalOrders orders)'
+                            : 'New Customer',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: isRepeat ? Colors.red : Colors.green,
+                        ),
+                      ),
+                      if (isRepeat)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(Icons.star, color: Colors.red, size: 18),
+                        ),
+                    ],
                   ),
-                  if (isRepeat)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 8),
-                      child: Icon(Icons.star, color: Colors.red, size: 18),
-                    ),
                 ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Confirm'),
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
       );
 
       if (confirmed == true) {
@@ -195,7 +199,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
       );
     }
   }
-
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
@@ -408,6 +411,33 @@ class _UserFormScreenState extends State<UserFormScreen> {
                               "${report?.onlineOrderCount ?? 0} (₹ ${report?.onlineAmount ?? '0'})",
                           icon: Icons.credit_card,
                           color: Colors.purple,
+                        ),
+
+                        const SizedBox(height: 24),
+                        const Divider(),
+
+                        // ✅ New Option: Open Payment QR Activity
+                        ListTile(
+                          leading: const Icon(
+                            Icons.qr_code,
+                            color: Colors.green,
+                          ),
+                          title: const Text(
+                            "Open Payment QR",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context); // close drawer first
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PaymentQRPage(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),

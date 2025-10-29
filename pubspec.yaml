@@ -51,6 +51,7 @@ dependencies:
   device_info_plus: ^9.0.3
   flutter_local_notifications: ^19.3.1
   webview_flutter: ^4.13.0
+  firebase_database: ^11.3.10
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4
 flutter_launcher_icons:
