@@ -178,7 +178,7 @@ class TestPrint {
 
 
 
-  Future<void> printInvoice(dynamic user, OrderModelResponse order) async {
+  Future<void> printInvoice(OrderModelResponse order) async {
     bool? isConnected = await bluetooth.isConnected;
     if (isConnected != true) return;
 

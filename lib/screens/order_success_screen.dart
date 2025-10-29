@@ -329,11 +329,6 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    final appProvider = Provider.of<AppProvider>(
-                      context,
-                      listen: false,
-                    );
-                    final user = appProvider.user;
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
@@ -355,7 +350,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                                     horizontal: 16,
                                     vertical: 20,
                                   ),
-                                  child: PrintScreen(user: user, order: order!),
+                                  child: PrintScreen(order: order!),
                                 ),
                               ],
                             ),

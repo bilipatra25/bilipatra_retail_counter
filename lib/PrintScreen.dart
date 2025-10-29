@@ -6,10 +6,9 @@ import 'TestPrint.dart';
 import 'models/order_model.dart';
 
 class PrintScreen extends StatefulWidget {
-  final dynamic user;
   final OrderModelResponse order;
 
-  const PrintScreen({super.key, required this.user, required this.order});
+  const PrintScreen({super.key, required this.order});
 
   @override
   State<PrintScreen> createState() => _PrintScreenState();
@@ -99,7 +98,7 @@ class _PrintScreenState extends State<PrintScreen> {
       await _saveSelectedDevice(_selectedDevice!);
 
       final printer = TestPrint();
-      await printer.printInvoice(widget.user, widget.order);
+      await printer.printInvoice(widget.order);
 
       ScaffoldMessenger.of(
         context,

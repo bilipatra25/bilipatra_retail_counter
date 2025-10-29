@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../PrintScreen.dart';
 import '../providers/app_provider.dart';
 import '../services/api_service.dart';
+import '../utils/PrinterHelper.dart';
 import '../utils/globals.dart';
 import '../models/order_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -34,68 +37,142 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
 
   Timer? countdownTimer;
   Duration remainingTime = const Duration(hours: 2);
+  OrderModelResponse? order;
+
+  StreamSubscription<DatabaseEvent>? _addedSub;
+  StreamSubscription<DatabaseEvent>? _changedSub;
 
   @override
   void initState() {
     super.initState();
-    _listenToOrders();
     NotificationEventHandler.onOrderDelivered = _handleOrderDelivered;
+    _listenToOrders();
   }
 
   void _listenToOrders() {
-    _ordersRef.onChildAdded.listen((event) {
-      _updateOrderData(event.snapshot, isNew: true);
+    debugPrint("👂 Listening to Firebase orders...");
+
+    _addedSub = _ordersRef.onChildAdded.listen((event) {
+      if (mounted) _updateOrderData(event.snapshot, isNew: true);
     });
-    _ordersRef.onChildChanged.listen((event) {
-      _updateOrderData(event.snapshot);
+
+    _changedSub = _ordersRef.onChildChanged.listen((event) {
+      if (mounted) _updateOrderData(event.snapshot);
     });
+
+    // Stop loader after timeout
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && isLoading) setState(() => isLoading = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    // Cancel Firebase subscriptions to avoid late setState()
+    _addedSub?.cancel();
+    _changedSub?.cancel();
+    NotificationEventHandler.onOrderDelivered = null;
+    super.dispose();
   }
 
   void _updateOrderData(DataSnapshot snapshot, {bool isNew = false}) {
     final rawData = snapshot.value;
     if (rawData == null || rawData is! Map) return;
 
-    // ✅ Convert to Map<String, dynamic>
     final data = Map<String, dynamic>.from(rawData);
-
     final orderId = data['orderId']?.toString();
     if (orderId == null) return;
 
+    bool shouldAutoPrint = false;
+
+    // Check if order already exists
     final existingIndex = _orderList.indexWhere(
       (o) => o['orderId'].toString() == orderId,
     );
+
     if (existingIndex >= 0) {
+      final prevOrder = _orderList[existingIndex];
+      final prevPaid = prevOrder['paid'] == true;
+      final newPaid = data['paid'] == true;
+
+      // ✅ Trigger only if it was unpaid before and now paid
+      if (!prevPaid && newPaid) {
+        shouldAutoPrint = true;
+      }
+
       _orderList[existingIndex] = data;
     } else {
       _orderList.add(data);
     }
 
+    // Update current order if needed
     if (isNew) {
-      _setCurrentOrder(data);
+      _setCurrentOrder(data, shouldAutoPrint: false);
     } else if (_currentOrder?['orderId'].toString() == orderId) {
-      _setCurrentOrder(data);
+      _setCurrentOrder(data, shouldAutoPrint: shouldAutoPrint);
     }
 
     setState(() => isLoading = false);
   }
 
-  void _setCurrentOrder(Map<String, dynamic> data) {
+  void _setCurrentOrder(
+    Map<String, dynamic> data, {
+    bool shouldAutoPrint = false,
+  }) async {
     setState(() {
       _currentOrder = data;
       isPaid = data['paid'] == true;
       isExpired = false;
+    });
 
-      if (data['createdAt'] != null) {
-        try {
-          final utc = DateFormat(
-            "yyyy-MM-dd HH:mm:ss",
-          ).parseUtc(data['createdAt']);
-          _startCountdownTimer(utc);
-        } catch (e) {
-          debugPrint("Invalid date format: $e");
+    // Handle countdown setup safely outside setState
+    if (data['createdAt'] != null) {
+      try {
+        final utc = DateFormat(
+          "yyyy-MM-dd HH:mm:ss",
+        ).parseUtc(data['createdAt']);
+        _startCountdownTimer(utc);
+      } catch (e) {
+        debugPrint("Invalid date format: $e");
+      }
+    }
+
+    // ✅ If the order is paid, fetch its full details and store globally
+    if (isPaid) {
+      try {
+        final loadedOrder = await _loadOrderDetails(data['orderId'].toString());
+        if (loadedOrder != null) {
+          setState(() => order = loadedOrder); // store it for reuse
+          debugPrint("✅ Order details loaded and saved for later use");
+        } else {
+          debugPrint("⚠️ Failed to load order details");
+        }
+
+        // 🔹 If payment just changed and auto-print is needed
+        if (shouldAutoPrint && loadedOrder != null) {
+          final success = await PrinterHelper.printInvoice(loadedOrder);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  success
+                      ? "✅ Invoice sent to printer"
+                      : "⚠️ Failed to print. Check printer connection.",
+                ),
+                backgroundColor: success ? Colors.green : Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint("Error during order fetch/print: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("❌ Error: $e")));
         }
       }
-    });
+    }
   }
 
   void _startCountdownTimer(DateTime createdAtUtc) {
@@ -231,6 +308,132 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
               : data == null
               ? const Center(child: Text("No payment QR available yet."))
               : _buildQrView(data),
+      floatingActionButton: FloatingActionButton.small(
+        child: const Icon(Icons.print, color: Colors.white),
+        backgroundColor: Colors.black87,
+        onPressed: () async {
+          final devices = await PrinterHelper.getBondedDevices();
+          final prefs = await SharedPreferences.getInstance();
+          final lastAddress = prefs.getString("last_selected_printer");
+
+          if (devices.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("No paired printers found.")),
+            );
+            return;
+          }
+
+          BluetoothDevice? defaultDevice;
+          try {
+            defaultDevice = devices.firstWhere((d) => d.address == lastAddress);
+          } catch (_) {
+            defaultDevice = null;
+          }
+
+          showModalBottomSheet(
+            context: context,
+            builder: (_) {
+              BluetoothDevice? selected = defaultDevice;
+              return StatefulBuilder(
+                builder: (context, setState) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          "Select Default Printer",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // 🔽 Dropdown with preselected default printer
+                        DropdownButton<BluetoothDevice>(
+                          isExpanded: true,
+                          hint: const Text("Select printer"),
+                          value: selected,
+                          items:
+                              devices
+                                  .map(
+                                    (d) => DropdownMenuItem(
+                                      value: d,
+                                      child: Text(d.name ?? "Unnamed Device"),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: (val) => setState(() => selected = val),
+                        ),
+                        const SizedBox(height: 16),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed:
+                                    selected == null
+                                        ? null
+                                        : () async {
+                                          await PrinterHelper.saveDefaultPrinter(
+                                            selected!,
+                                          );
+                                          Navigator.pop(context);
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                "✅ ${selected!.name ?? 'Printer'} set as default",
+                                              ),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                        },
+                                icon: const Icon(Icons.save),
+                                label: const Text("Save"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => Navigator.pop(context),
+                                icon: const Icon(Icons.close),
+                                label: const Text("Close"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black54,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -330,17 +533,14 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () async {
-                              final appProvider = Provider.of<AppProvider>(
-                                context,
-                                listen: false,
-                              );
-                              final user = appProvider.user;
-
-                              final order = await _loadOrderDetails(
-                                data['orderId'].toString(),
-                              );
-                              if (order == null) return;
-
+                              if (order == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("⚠️ Order not loaded yet."),
+                                  ),
+                                );
+                                return;
+                              }
                               showModalBottomSheet(
                                 context: context,
                                 isScrollControlled: true,
@@ -365,10 +565,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                                               horizontal: 16,
                                               vertical: 20,
                                             ),
-                                            child: PrintScreen(
-                                              user: user,
-                                              order: order,
-                                            ),
+                                            child: PrintScreen(order: order!),
                                           ),
                                         ],
                                       ),
@@ -424,19 +621,12 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       final res = await api.orderListById(orderId.toString());
 
       if (res['flag'] == 1 && res['data'] != null) {
-        final order = OrderModelResponse.fromJson(res['data']);
-        return order;
+        return OrderModelResponse.fromJson(res['data']);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to load order details.")),
-        );
         return null;
       }
     } catch (e) {
-      print("❌ Error loading order: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("❌ Error loading order: $e")));
+      debugPrint("❌ Error loading order: $e");
       return null;
     }
   }
