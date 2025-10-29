@@ -10,6 +10,8 @@ import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../utils/globals.dart';
 import '../models/order_model.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 
 class PaymentQRPage extends StatefulWidget {
   const PaymentQRPage({Key? key}) : super(key: key);
@@ -144,10 +146,10 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       appBar: AppBar(
         backgroundColor:
             isPaid
-                ? Colors.blueAccent
+                ? Colors.green
                 : isExpired
                 ? Colors.grey
-                : Colors.green,
+                : Colors.blueAccent,
         foregroundColor: Colors.white,
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -177,7 +179,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  "₹${data['amount'] ?? 0}",
+                  "₹${(data['amount'] ?? 0).toString().replaceAll(RegExp(r'\.0+$'), '')}",
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -257,11 +259,21 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                   builder:
                       (context, constraints) => SizedBox(
                         width: constraints.maxWidth,
-                        child: Image.network(
-                          qrImageUrl ?? '',
-                          fit: BoxFit.fitHeight,
-                          errorBuilder:
-                              (context, error, stackTrace) => const Center(
+                        child: CachedNetworkImage(
+                          imageUrl: qrImageUrl ?? '',
+                          fit: BoxFit.cover,
+                          placeholder:
+                              (context, url) => Shimmer.fromColors(
+                                baseColor: Colors.grey.shade300,
+                                highlightColor: Colors.grey.shade100,
+                                child: Container(
+                                  width: constraints.maxWidth,
+                                  height: double.maxFinite,
+                                  color: Colors.white,
+                                ),
+                              ),
+                          errorWidget:
+                              (context, url, error) => const Center(
                                 child: Text('Failed to load QR image'),
                               ),
                         ),
@@ -283,7 +295,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.8),
+                  color: Colors.blueAccent.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
