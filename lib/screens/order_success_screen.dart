@@ -373,10 +373,10 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    final confirm = await showConfirmHomeDialog(context);
-                    if (confirm) {
+                    // final confirm = await showConfirmHomeDialog(context);
+                    // if (confirm) {
                       context.go('/');
-                    }
+                    // }
                   },
                   icon: const Icon(Icons.home),
                   label: const Text("Back to Home"),
