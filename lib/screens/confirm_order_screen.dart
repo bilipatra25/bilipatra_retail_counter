@@ -395,38 +395,38 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                   : () async {
                                     if (_selectedOrderType == OrderType.cash) {
                                       // Show confirmation dialog only for cash orders
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder:
-                                            (_) => AlertDialog(
-                                              title: const Text("Place Order?"),
-                                              content: const Text(
-                                                "Do you want to place this order?",
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed:
-                                                      () => Navigator.pop(
-                                                        context,
-                                                        false,
-                                                      ),
-                                                  child: const Text("Cancel"),
-                                                ),
-                                                TextButton(
-                                                  onPressed:
-                                                      () => Navigator.pop(
-                                                        context,
-                                                        true,
-                                                      ),
-                                                  child: const Text("Confirm"),
-                                                ),
-                                              ],
-                                            ),
-                                      );
-
-                                      if (confirm ?? false) {
+                                      // final confirm = await showDialog<bool>(
+                                      //   context: context,
+                                      //   builder:
+                                      //       (_) => AlertDialog(
+                                      //         title: const Text("Place Order?"),
+                                      //         content: const Text(
+                                      //           "Do you want to place this order?",
+                                      //         ),
+                                      //         actions: [
+                                      //           TextButton(
+                                      //             onPressed:
+                                      //                 () => Navigator.pop(
+                                      //                   context,
+                                      //                   false,
+                                      //                 ),
+                                      //             child: const Text("Cancel"),
+                                      //           ),
+                                      //           TextButton(
+                                      //             onPressed:
+                                      //                 () => Navigator.pop(
+                                      //                   context,
+                                      //                   true,
+                                      //                 ),
+                                      //             child: const Text("Confirm"),
+                                      //           ),
+                                      //         ],
+                                      //       ),
+                                      // );
+                                      //
+                                      // if (confirm ?? false) {
                                         await _placeOrder(user, products);
-                                      }
+                                      // }
                                     } else {
                                       // Directly place order or redirect for other order types
                                       await _placeOrder(user, products);
