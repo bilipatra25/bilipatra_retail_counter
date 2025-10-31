@@ -110,6 +110,11 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       }
     }
 
+    // ✅ Keep only the last 5 most recent orders
+    if (_orderList.length > 5) {
+      _orderList = _orderList.sublist(_orderList.length - 5);
+    }
+
     // ✅ Update current order only if it's new or currently active
     if (_currentOrder == null ||
         _currentOrder?['orderId'].toString() == orderId ||
