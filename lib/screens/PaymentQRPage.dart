@@ -75,7 +75,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     super.dispose();
   }
 
-  void _updateOrderData(DataSnapshot snapshot, {bool isNew = false}) {
+  void _updateOrderData(DataSnapshot snapshot, {bool isNew = false}) async {
     final rawData = snapshot.value;
     if (rawData == null || rawData is! Map) return;
 
@@ -95,27 +95,32 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       final prevPaid = prevOrder['paid'] == true;
       final newPaid = data['paid'] == true;
 
-      // ✅ Trigger only if it was unpaid before and now paid
-      if (!prevPaid && newPaid) {
+      // ✅ Trigger print only when online payment changes from unpaid → paid
+      if (!prevPaid && newPaid && data['method'] == "online") {
         shouldAutoPrint = true;
       }
 
       _orderList[existingIndex] = data;
     } else {
       _orderList.add(data);
+
+      // ✅ For new cash orders, print if not yet printed
+      if (data['method'] == "cash" && data['printed'] != true) {
+        shouldAutoPrint = true;
+      }
     }
 
-    // Update current order if needed
-    if (isNew) {
-      _setCurrentOrder(data, shouldAutoPrint: false);
-    } else if (_currentOrder?['orderId'].toString() == orderId) {
+    // ✅ Update current order only if it's new or currently active
+    if (_currentOrder == null ||
+        _currentOrder?['orderId'].toString() == orderId ||
+        isNew) {
       _setCurrentOrder(data, shouldAutoPrint: shouldAutoPrint);
     }
 
-    setState(() => isLoading = false);
+    if (mounted) setState(() => isLoading = false);
   }
 
-  void _setCurrentOrder(
+  Future<void> _setCurrentOrder(
     Map<String, dynamic> data, {
     bool shouldAutoPrint = false,
   }) async {
@@ -125,7 +130,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       isExpired = false;
     });
 
-    // Handle countdown setup safely outside setState
+    // Handle countdown safely
     if (data['createdAt'] != null) {
       try {
         final utc = DateFormat(
@@ -137,40 +142,46 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       }
     }
 
-    // ✅ If the order is paid, fetch its full details and store globally
-    if (isPaid) {
-      try {
-        final loadedOrder = await _loadOrderDetails(data['orderId'].toString());
-        if (loadedOrder != null) {
-          setState(() => order = loadedOrder); // store it for reuse
-          debugPrint("✅ Order details loaded and saved for later use");
-        } else {
-          debugPrint("⚠️ Failed to load order details");
+    // Fetch full order details
+    try {
+      final loadedOrder = await _loadOrderDetails(data['orderId'].toString());
+      if (loadedOrder == null) {
+        debugPrint("⚠️ Failed to load order details");
+        return;
+      }
+
+      setState(() => order = loadedOrder);
+
+      // 🔹 Print invoice only when needed
+      if (shouldAutoPrint) {
+        final success = await PrinterHelper.printInvoice(loadedOrder);
+
+        // 🔸 Mark as printed in Firebase after successful print
+        if (success) {
+          await _ordersRef.child(data['orderId'].toString()).update({
+            'printed': true,
+          });
         }
 
-        // 🔹 If payment just changed and auto-print is needed
-        if (shouldAutoPrint && loadedOrder != null) {
-          final success = await PrinterHelper.printInvoice(loadedOrder);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  success
-                      ? "✅ Invoice sent to printer"
-                      : "⚠️ Failed to print. Check printer connection.",
-                ),
-                backgroundColor: success ? Colors.green : Colors.red,
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        debugPrint("Error during order fetch/print: $e");
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("❌ Error: $e")));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                success
+                    ? "✅ Invoice sent to printer"
+                    : "⚠️ Failed to print. Check printer connection.",
+              ),
+              backgroundColor: success ? Colors.green : Colors.red,
+            ),
+          );
         }
+      }
+    } catch (e) {
+      debugPrint("❌ Error during order fetch/print: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("❌ Error: $e")));
       }
     }
   }
@@ -439,7 +450,158 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
 
   Widget _buildQrView(Map<String, dynamic> data) {
     final qrImageUrl = data['image']?.toString();
+    final isCashOrder = data['method']?.toString().toLowerCase() == 'cash';
 
+    // ✅ CASE 1: Cash Orders (No QR image)
+    if (isCashOrder) {
+      return Container(
+        color: Colors.white,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.attach_money, color: Colors.green, size: 80),
+                const SizedBox(height: 12),
+                const Text(
+                  "Cash Payment Order",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Order ID: ${data['orderId'] ?? 'N/A'}",
+                  style: const TextStyle(fontSize: 16, color: Colors.black87),
+                ),
+                const SizedBox(height: 20),
+                if (isPaid)
+                  Column(
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 50,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Payment Confirmed",
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  if (order == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          "⚠️ Order not loaded yet.",
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.white,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(20),
+                                      ),
+                                    ),
+                                    builder:
+                                        (context) => Padding(
+                                          padding: EdgeInsets.only(
+                                            bottom:
+                                                MediaQuery.of(
+                                                  context,
+                                                ).viewInsets.bottom,
+                                          ),
+                                          child: Wrap(
+                                            children: [
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 20,
+                                                    ),
+                                                child: PrintScreen(
+                                                  order: order!,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                  );
+                                },
+                                icon: const Icon(Icons.print),
+                                label: const Text("Print Invoice"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black87,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed:
+                                    () => _navigateToSuccess(
+                                      context,
+                                      data['orderId'],
+                                    ),
+                                icon: const Icon(Icons.document_scanner),
+                                label: const Text("View Invoice"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  const Text(
+                    "Collect payment in cash from customer.",
+                    style: TextStyle(fontSize: 16, color: Colors.black54),
+                    textAlign: TextAlign.center,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ✅ CASE 2: Online Orders with QR image
     return Stack(
       children: [
         Positioned.fill(
