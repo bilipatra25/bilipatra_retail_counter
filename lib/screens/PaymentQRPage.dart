@@ -34,6 +34,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
   bool isLoading = true;
   bool isExpired = false;
   bool isPaid = false;
+  bool isOrderLoading = false;
 
   Timer? countdownTimer;
   Duration remainingTime = const Duration(hours: 2);
@@ -43,9 +44,12 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
   StreamSubscription<DatabaseEvent>? _changedSub;
   bool _autoPrintEnabled = true;
 
+  final Set<String> _recentlyPrinted = {};
+  late DateTime _sessionStartTime;
   @override
   void initState() {
     super.initState();
+    _sessionStartTime = DateTime.now().toUtc(); // record session start
     _loadAutoPrintSetting();
     NotificationEventHandler.onOrderDelivered = _handleOrderDelivered;
     _listenToOrders();
@@ -147,6 +151,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       _currentOrder = data;
       isPaid = data['paid'] == true;
       isExpired = false;
+      isOrderLoading = true; // Start loader
     });
 
     // Handle countdown safely
@@ -161,43 +166,27 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       }
     }
 
-    // Fetch full order details
     try {
       final loadedOrder = await _loadOrderDetails(data['orderId'].toString());
       if (loadedOrder == null) {
         debugPrint("⚠️ Failed to load order details");
-        return;
       }
 
-      setState(() => order = loadedOrder);
+      if (mounted) {
+        setState(() {
+          order = loadedOrder;
+          isOrderLoading = false; // Stop loader
+        });
+      }
 
-      // 🔹 Print invoice only when needed
-      if (_autoPrintEnabled && shouldAutoPrint) {
-        final success = await PrinterHelper.printInvoice(loadedOrder);
-
-        // 🔸 Mark as printed in Firebase after successful print
-        if (success) {
-          await _ordersRef.child(data['orderId'].toString()).update({
-            'printed': true,
-          });
-        }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                success
-                    ? "✅ Invoice sent to printer"
-                    : "⚠️ Failed to print. Check printer connection.",
-              ),
-              backgroundColor: success ? Colors.green : Colors.red,
-            ),
-          );
-        }
+      // Auto-print logic remains the same...
+      if (_autoPrintEnabled && shouldAutoPrint && loadedOrder != null) {
+        await _handleAutoPrint(data, loadedOrder);
       }
     } catch (e) {
       debugPrint("❌ Error during order fetch/print: $e");
       if (mounted) {
+        setState(() => isOrderLoading = false);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text("❌ Error: $e")));
@@ -491,7 +480,84 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     final qrImageUrl = data['image']?.toString();
     final isCashOrder = data['method']?.toString().toLowerCase() == 'cash';
 
-    // ✅ CASE 1: Cash Orders (No QR image)
+    // Common buttons for Print & View Invoice
+    Widget _orderActionButtons() {
+      if (isOrderLoading) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (order == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("⚠️ Order not loaded yet."),
+                      ),
+                    );
+                    return;
+                  }
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.white,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    builder: (context) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(context).viewInsets.bottom,
+                      ),
+                      child: Wrap(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                            child: PrintScreen(order: order!),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.print),
+                label: const Text("Print Invoice"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black87,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _navigateToSuccess(context, data['orderId']),
+                icon: const Icon(Icons.document_scanner),
+                label: const Text("View Invoice"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // CASE 1: Cash Orders
     if (isCashOrder) {
       return Container(
         color: Colors.white,
@@ -517,116 +583,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                   style: const TextStyle(fontSize: 16, color: Colors.black87),
                 ),
                 const SizedBox(height: 20),
-                if (isPaid)
-                  Column(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 50,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "Payment Confirmed",
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  if (order == null) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          "⚠️ Order not loaded yet.",
-                                        ),
-                                      ),
-                                    );
-                                    return;
-                                  }
-                                  showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    backgroundColor: Colors.white,
-                                    shape: const RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.vertical(
-                                        top: Radius.circular(20),
-                                      ),
-                                    ),
-                                    builder:
-                                        (context) => Padding(
-                                          padding: EdgeInsets.only(
-                                            bottom:
-                                                MediaQuery.of(
-                                                  context,
-                                                ).viewInsets.bottom,
-                                          ),
-                                          child: Wrap(
-                                            children: [
-                                              Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 16,
-                                                      vertical: 20,
-                                                    ),
-                                                child: PrintScreen(
-                                                  order: order!,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                  );
-                                },
-                                icon: const Icon(Icons.print),
-                                label: const Text("Print Invoice"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.black87,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed:
-                                    () => _navigateToSuccess(
-                                      context,
-                                      data['orderId'],
-                                    ),
-                                icon: const Icon(Icons.document_scanner),
-                                label: const Text("View Invoice"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  )
+                if (isPaid) _orderActionButtons()
                 else
                   const Text(
                     "Collect payment in cash from customer.",
@@ -640,53 +597,43 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       );
     }
 
-    // ✅ CASE 2: Online Orders with QR image
+    // CASE 2: Online Orders
     return Stack(
       children: [
         Positioned.fill(
           child: Center(
             child: ColorFiltered(
-              colorFilter:
-                  isPaid
-                      ? const ColorFilter.mode(
-                        Colors.grey,
-                        BlendMode.saturation,
-                      )
-                      : const ColorFilter.mode(
-                        Colors.transparent,
-                        BlendMode.multiply,
-                      ),
+              colorFilter: isPaid
+                  ? const ColorFilter.mode(Colors.grey, BlendMode.saturation)
+                  : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
               child: InteractiveViewer(
                 minScale: 1,
                 maxScale: 4,
                 child: LayoutBuilder(
-                  builder:
-                      (context, constraints) => SizedBox(
-                        width: constraints.maxWidth,
-                        child: CachedNetworkImage(
-                          imageUrl: qrImageUrl ?? '',
-                          fit: BoxFit.cover,
-                          placeholder:
-                              (context, url) => Shimmer.fromColors(
-                                baseColor: Colors.grey.shade300,
-                                highlightColor: Colors.grey.shade100,
-                                child: Container(
-                                  width: constraints.maxWidth,
-                                  height: double.maxFinite,
-                                  color: Colors.white,
-                                ),
-                              ),
-                          errorWidget:
-                              (context, url, error) => const Center(
-                                child: Text('Failed to load QR image'),
-                              ),
+                  builder: (context, constraints) => SizedBox(
+                    width: constraints.maxWidth,
+                    child: CachedNetworkImage(
+                      imageUrl: qrImageUrl ?? '',
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Shimmer.fromColors(
+                        baseColor: Colors.grey.shade300,
+                        highlightColor: Colors.grey.shade100,
+                        child: Container(
+                          width: constraints.maxWidth,
+                          height: double.maxFinite,
+                          color: Colors.white,
                         ),
                       ),
+                      errorWidget: (context, url, error) =>
+                      const Center(child: Text('Failed to load QR image')),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
         ),
+
         if (!isPaid && !isExpired)
           Positioned(
             top: 20,
@@ -694,10 +641,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
             right: 0,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.blueAccent.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(12),
@@ -709,6 +653,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
               ),
             ),
           ),
+
         if (isPaid)
           Container(
             color: Colors.white.withOpacity(1),
@@ -727,87 +672,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              if (order == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("⚠️ Order not loaded yet."),
-                                  ),
-                                );
-                                return;
-                              }
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.white,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(
-                                    top: Radius.circular(20),
-                                  ),
-                                ),
-                                builder:
-                                    (context) => Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom:
-                                            MediaQuery.of(
-                                              context,
-                                            ).viewInsets.bottom,
-                                      ),
-                                      child: Wrap(
-                                        children: [
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 20,
-                                            ),
-                                            child: PrintScreen(order: order!),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                              );
-                            },
-                            icon: const Icon(Icons.print),
-                            label: const Text("Print Invoice"),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black87,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed:
-                                () => _navigateToSuccess(
-                                  context,
-                                  data['orderId'],
-                                ),
-                            icon: const Icon(Icons.document_scanner),
-                            label: const Text("View Invoice"),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _orderActionButtons(),
                 ],
               ),
             ),
@@ -845,5 +710,60 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       'orderSuccess',
       pathParameters: {'orderId': data.toString()},
     );
+  }
+
+  Future<void> _handleAutoPrint(
+    Map<String, dynamic> data,
+    OrderModelResponse loadedOrder,
+  ) async {
+    final orderId = data['orderId'].toString();
+
+    // 1️⃣ Skip if we already printed this order locally
+    if (_recentlyPrinted.contains(orderId)) {
+      debugPrint("🟡 Skipping duplicate print for $orderId (cached)");
+      return;
+    }
+
+    // 2️⃣ Skip if order is older than app session (avoid old prints)
+    try {
+      final createdAt = DateFormat(
+        "yyyy-MM-dd HH:mm:ss",
+      ).parseUtc(data['createdAt']);
+      if (createdAt.isBefore(
+        _sessionStartTime.subtract(const Duration(seconds: 5)),
+      )) {
+        debugPrint("🟡 Skipping old order $orderId (created before session)");
+        return;
+      }
+    } catch (_) {}
+
+    // 3️⃣ Recheck Firebase for 'printed' status
+    final latestSnapshot = await _ordersRef.child(orderId).get();
+    final latestData = latestSnapshot.value as Map?;
+    if (latestData?['printed'] == true) {
+      debugPrint("🟡 Skipping print for $orderId (already marked printed)");
+      return;
+    }
+
+    // ✅ Proceed with print
+    final success = await PrinterHelper.printInvoice(loadedOrder);
+    if (success) {
+      _recentlyPrinted.add(orderId);
+      await _ordersRef.child(orderId).update({'printed': true});
+      debugPrint("🟢 Order $orderId printed successfully");
+    } else {
+      debugPrint("🔴 Failed to print order $orderId");
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? "✅ Invoice printed" : "⚠️ Print failed. Check printer.",
+          ),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+    }
   }
 }
