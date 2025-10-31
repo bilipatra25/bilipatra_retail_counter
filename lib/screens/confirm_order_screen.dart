@@ -320,77 +320,66 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: 12.0,
-                              top: 6,
-                            ),
+                            padding: const EdgeInsets.only(bottom: 12.0, top: 6),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 0,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               decoration: BoxDecoration(
                                 color: Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.green.shade200,
-                                ),
+                                border: Border.all(color: Colors.green.shade200),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(
-                                    Icons.payment,
-                                    color: Colors.green,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Text(
-                                    "Payment Type:",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 20),
-                                  Expanded(
-                                    child: DropdownButtonHideUnderline(
-                                      child: DropdownButton<OrderType>(
-                                        value: _selectedOrderType,
-                                        isExpanded: true,
-                                        icon: const Icon(
-                                          Icons.keyboard_arrow_down_rounded,
-                                        ),
-                                        dropdownColor: Colors.white,
-                                        borderRadius: BorderRadius.circular(12),
-                                        style: const TextStyle(
+                                  Row(
+                                    children: const [
+                                      Icon(Icons.payment, color: Colors.green),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        "Payment Type:",
+                                        style: TextStyle(
                                           fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.black87,
+                                          fontWeight: FontWeight.w600,
                                         ),
-                                        onChanged: (OrderType? newValue) {
-                                          if (newValue != null) {
-                                            setState(() {
-                                              _selectedOrderType = newValue;
-                                            });
-                                          }
-                                        },
-                                        items:
-                                            OrderType.values.map((
-                                              OrderType type,
-                                            ) {
-                                              return DropdownMenuItem<
-                                                OrderType
-                                              >(
-                                                value: type,
-                                                child: Text(type.label),
-                                              );
-                                            }).toList(),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SegmentedButton<OrderType>(
+                                    segments: OrderType.values.map((type) {
+                                      return ButtonSegment<OrderType>(
+                                        value: type,
+                                        label: Text(type.label),
+                                        icon: Icon(
+                                          type == OrderType.online
+                                              ? Icons.qr_code_2
+                                              : Icons.attach_money_rounded,
+                                        ),
+                                      );
+                                    }).toList(),
+                                    selected: <OrderType>{_selectedOrderType},
+                                    onSelectionChanged: (newSelection) {
+                                      setState(() {
+                                        _selectedOrderType = newSelection.first;
+                                      });
+                                    },
+                                    style: ButtonStyle(
+                                      backgroundColor: WidgetStateProperty.resolveWith((states) {
+                                        if (states.contains(WidgetState.selected)) {
+                                          return Colors.green.shade200;
+                                        }
+                                        return Colors.white;
+                                      }),
+                                      foregroundColor: WidgetStateProperty.all(Colors.black87),
+                                      padding: WidgetStateProperty.all(
+                                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
+                          )
                         ],
                       ),
                     ),
