@@ -41,12 +41,26 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
 
   StreamSubscription<DatabaseEvent>? _addedSub;
   StreamSubscription<DatabaseEvent>? _changedSub;
+  bool _autoPrintEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    _loadAutoPrintSetting();
     NotificationEventHandler.onOrderDelivered = _handleOrderDelivered;
     _listenToOrders();
+  }
+
+  Future<void> _loadAutoPrintSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _autoPrintEnabled = prefs.getBool("auto_print_enabled") ?? true;
+    });
+  }
+
+  Future<void> _saveAutoPrintSetting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool("auto_print_enabled", value);
   }
 
   void _listenToOrders() {
@@ -158,7 +172,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       setState(() => order = loadedOrder);
 
       // 🔹 Print invoice only when needed
-      if (shouldAutoPrint) {
+      if (_autoPrintEnabled && shouldAutoPrint) {
         final success = await PrinterHelper.printInvoice(loadedOrder);
 
         // 🔸 Mark as printed in Firebase after successful print
@@ -283,6 +297,26 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: _autoPrintEnabled ? "Auto Print: ON" : "Auto Print: OFF",
+            icon: Icon(
+              _autoPrintEnabled ? Icons.print : Icons.print_disabled,
+              color: _autoPrintEnabled ? Colors.white : Colors.white70,
+            ),
+            onPressed: () async {
+              final newValue = !_autoPrintEnabled;
+              setState(() => _autoPrintEnabled = newValue);
+              await _saveAutoPrintSetting(newValue);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    newValue ? "✅ Auto Print Enabled" : "❌ Auto Print Disabled",
+                  ),
+                  backgroundColor: newValue ? Colors.green : Colors.orange,
+                ),
+              );
+            },
+          ),
           if (_orderList.isNotEmpty)
             PopupMenuButton<Map<String, dynamic>>(
               icon: const Icon(Icons.list_alt),
