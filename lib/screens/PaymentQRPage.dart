@@ -129,7 +129,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     }
 
     // ✅ Keep only the last 5 most recent orders
-    if (_orderList.length > 5) {
+    if (_orderList.length > 10) {
       _orderList = _orderList.sublist(_orderList.length - 5);
     }
 
@@ -239,109 +239,111 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
             : "Complete Payment";
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor:
-            isPaid
-                ? Colors.green
-                : isExpired
-                ? Colors.grey
-                : Colors.blueAccent,
-        foregroundColor: Colors.white,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            if (data != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "#${data['orderId']} - ${data['name'] ?? ''}",
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                  Text(
-                    title,
-                    style: const TextStyle(fontSize: 13, color: Colors.white70),
-                  ),
-                ],
-              ),
-            if (data != null)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  "₹${(data['amount'] ?? 0).toString().replaceAll(RegExp(r'\.0+$'), '')}",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: _autoPrintEnabled ? "Auto Print: ON" : "Auto Print: OFF",
-            icon: Icon(
-              _autoPrintEnabled ? Icons.print : Icons.print_disabled,
-              color: _autoPrintEnabled ? Colors.white : Colors.white70,
-            ),
-            onPressed: () async {
-              final newValue = !_autoPrintEnabled;
-              setState(() => _autoPrintEnabled = newValue);
-              await _saveAutoPrintSetting(newValue);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    newValue ? "✅ Auto Print Enabled" : "❌ Auto Print Disabled",
-                  ),
-                  backgroundColor: newValue ? Colors.green : Colors.orange,
-                ),
-              );
-            },
-          ),
-          if (_orderList.isNotEmpty)
-            PopupMenuButton<Map<String, dynamic>>(
-              icon: const Icon(Icons.list_alt),
-              onSelected: (order) {
-                _setCurrentOrder(order);
-              },
-              itemBuilder: (context) {
-                return _orderList.map((order) {
-                  final id = order['orderId'];
-                  final name = order['name'] ?? '';
-                  final paid = order['paid'] == true;
-                  return PopupMenuItem(
-                    value: order,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text("#$id - $name"),
-                        if (paid)
-                          const Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                            size: 18,
+        appBar: AppBar(
+          backgroundColor: isPaid
+              ? Colors.green
+              : isExpired
+              ? Colors.grey
+              : Colors.blueAccent,
+          foregroundColor: Colors.white,
+          title: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    if (_orderList.isEmpty) return;
+
+                    showModalBottomSheet(
+                      context: context,
+                      builder: (context) {
+                        return ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _orderList.length,
+                          separatorBuilder: (_, __) => const Divider(),
+                          itemBuilder: (context, index) {
+                            final order = _orderList[index];
+                            final id = order['orderId'];
+                            final name = order['name'] ?? '';
+                            final paid = order['paid'] == true;
+                            return ListTile(
+                              title: Text("#$id - $name"),
+                              trailing: paid
+                                  ? const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                              )
+                                  : null,
+                              onTap: () {
+                                _setCurrentOrder(order);
+                                Navigator.pop(context);
+                              },
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "#${data?['orderId'] ?? ''} - ${data?['name'] ?? ''}",
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                      ],
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.white70,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Colors.white70,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (data != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "₹${(data['amount'] ?? 0).toString().replaceAll(RegExp(r'\.0+$'), '')}",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                  );
-                }).toList();
-              },
-            ),
-        ],
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+                  ),
+                ),
+            ],
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
         ),
-      ),
-      body:
+        body:
           isLoading
               ? const Center(child: CircularProgressIndicator())
               : data == null
@@ -381,7 +383,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text(
-                          "Select Default Printer",
+                          "Printer Settings",
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -404,6 +406,28 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                                   )
                                   .toList(),
                           onChanged: (val) => setState(() => selected = val),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 🔄 Auto Print toggle
+                        SwitchListTile(
+                          title: const Text("Auto Print"),
+                          value: _autoPrintEnabled,
+                          onChanged: (val) async {
+                            setState(() => _autoPrintEnabled = val);
+                            await _saveAutoPrintSetting(val);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  val
+                                      ? "✅ Auto Print Enabled"
+                                      : "❌ Auto Print Disabled",
+                                ),
+                                backgroundColor:
+                                    val ? Colors.green : Colors.orange,
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 16),
 
@@ -483,9 +507,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     // Common buttons for Print & View Invoice
     Widget _orderActionButtons() {
       if (isOrderLoading) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+        return const Center(child: CircularProgressIndicator());
       }
       return Padding(
         padding: const EdgeInsets.all(16),
@@ -496,9 +518,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                 onPressed: () async {
                   if (order == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("⚠️ Order not loaded yet."),
-                      ),
+                      const SnackBar(content: Text("⚠️ Order not loaded yet.")),
                     );
                     return;
                   }
@@ -507,21 +527,27 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                     isScrollControlled: true,
                     backgroundColor: Colors.white,
                     shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                    ),
-                    builder: (context) => Padding(
-                      padding: EdgeInsets.only(
-                        bottom: MediaQuery.of(context).viewInsets.bottom,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
                       ),
-                      child: Wrap(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                            child: PrintScreen(order: order!),
+                    ),
+                    builder:
+                        (context) => Padding(
+                          padding: EdgeInsets.only(
+                            bottom: MediaQuery.of(context).viewInsets.bottom,
                           ),
-                        ],
-                      ),
-                    ),
+                          child: Wrap(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 20,
+                                ),
+                                child: PrintScreen(order: order!),
+                              ),
+                            ],
+                          ),
+                        ),
                   );
                 },
                 icon: const Icon(Icons.print),
@@ -583,7 +609,8 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                   style: const TextStyle(fontSize: 16, color: Colors.black87),
                 ),
                 const SizedBox(height: 20),
-                if (isPaid) _orderActionButtons()
+                if (isPaid)
+                  _orderActionButtons()
                 else
                   const Text(
                     "Collect payment in cash from customer.",
@@ -603,31 +630,42 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
         Positioned.fill(
           child: Center(
             child: ColorFiltered(
-              colorFilter: isPaid
-                  ? const ColorFilter.mode(Colors.grey, BlendMode.saturation)
-                  : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+              colorFilter:
+                  isPaid
+                      ? const ColorFilter.mode(
+                        Colors.grey,
+                        BlendMode.saturation,
+                      )
+                      : const ColorFilter.mode(
+                        Colors.transparent,
+                        BlendMode.multiply,
+                      ),
               child: InteractiveViewer(
                 minScale: 1,
                 maxScale: 4,
                 child: LayoutBuilder(
-                  builder: (context, constraints) => SizedBox(
-                    width: constraints.maxWidth,
-                    child: CachedNetworkImage(
-                      imageUrl: qrImageUrl ?? '',
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Shimmer.fromColors(
-                        baseColor: Colors.grey.shade300,
-                        highlightColor: Colors.grey.shade100,
-                        child: Container(
-                          width: constraints.maxWidth,
-                          height: double.maxFinite,
-                          color: Colors.white,
+                  builder:
+                      (context, constraints) => SizedBox(
+                        width: constraints.maxWidth,
+                        child: CachedNetworkImage(
+                          imageUrl: qrImageUrl ?? '',
+                          fit: BoxFit.cover,
+                          placeholder:
+                              (context, url) => Shimmer.fromColors(
+                                baseColor: Colors.grey.shade300,
+                                highlightColor: Colors.grey.shade100,
+                                child: Container(
+                                  width: constraints.maxWidth,
+                                  height: double.maxFinite,
+                                  color: Colors.white,
+                                ),
+                              ),
+                          errorWidget:
+                              (context, url, error) => const Center(
+                                child: Text('Failed to load QR image'),
+                              ),
                         ),
                       ),
-                      errorWidget: (context, url, error) =>
-                      const Center(child: Text('Failed to load QR image')),
-                    ),
-                  ),
                 ),
               ),
             ),
@@ -641,7 +679,10 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
             right: 0,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.blueAccent.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(12),
