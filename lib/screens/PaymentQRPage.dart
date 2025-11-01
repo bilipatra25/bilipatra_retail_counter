@@ -15,6 +15,7 @@ import '../utils/globals.dart';
 import '../models/order_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class PaymentQRPage extends StatefulWidget {
   const PaymentQRPage({Key? key}) : super(key: key);
@@ -46,13 +47,43 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
 
   final Set<String> _recentlyPrinted = {};
   late DateTime _sessionStartTime;
+  bool _showPlaceholder = false;
+  Timer? _inactivityTimer;
+
   @override
   void initState() {
     super.initState();
-    _sessionStartTime = DateTime.now().toUtc(); // record session start
+    _sessionStartTime = DateTime.now().toUtc();
     _loadAutoPrintSetting();
     NotificationEventHandler.onOrderDelivered = _handleOrderDelivered;
     _listenToOrders();
+
+    // 💤 Prevent screen from sleeping
+    WakelockPlus.enable();
+
+    // Start inactivity timer
+    _resetInactivityTimer();
+  }
+
+  @override
+  void dispose() {
+    _addedSub?.cancel();
+    _changedSub?.cancel();
+    NotificationEventHandler.onOrderDelivered = null;
+
+    // 💤 Allow screen to sleep again
+    WakelockPlus.disable();
+
+    // Cancel inactivity timer
+    _inactivityTimer?.cancel();
+    super.dispose();
+  }
+
+  void _resetInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _showPlaceholder = true);
+    });
   }
 
   Future<void> _loadAutoPrintSetting() async {
@@ -79,21 +110,15 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     });
 
     // Stop loader after timeout
-    Future.delayed(const Duration(seconds: 5), () {
+    Future.delayed(const Duration(minutes: 1), () {
       if (mounted && isLoading) setState(() => isLoading = false);
     });
   }
 
-  @override
-  void dispose() {
-    // Cancel Firebase subscriptions to avoid late setState()
-    _addedSub?.cancel();
-    _changedSub?.cancel();
-    NotificationEventHandler.onOrderDelivered = null;
-    super.dispose();
-  }
-
   void _updateOrderData(DataSnapshot snapshot, {bool isNew = false}) async {
+    setState(() => _showPlaceholder = false);
+    _resetInactivityTimer();
+
     final rawData = snapshot.value;
     if (rawData == null || rawData is! Map) return;
 
@@ -239,264 +264,353 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
             : "Complete Payment";
 
     return Scaffold(
-        appBar: AppBar(
-          backgroundColor: isPaid
-              ? Colors.green
-              : isExpired
-              ? Colors.grey
-              : Colors.blueAccent,
-          foregroundColor: Colors.white,
-          title: Row(
-            children: [
-              Expanded(
+      appBar:
+          _showPlaceholder
+              ? null
+              : AppBar(
+                backgroundColor:
+                    isPaid
+                        ? Colors.green
+                        : isExpired
+                        ? Colors.grey
+                        : Colors.blueAccent,
+                foregroundColor: Colors.white,
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          if (_orderList.isEmpty) return;
+
+                          showModalBottomSheet(
+                            context: context,
+                            builder: (context) {
+                              return ListView.separated(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _orderList.length,
+                                separatorBuilder: (_, __) => const Divider(),
+                                itemBuilder: (context, index) {
+                                  final order = _orderList[index];
+                                  final id = order['orderId'];
+                                  final name = order['name'] ?? '';
+                                  final paid = order['paid'] == true;
+                                  return ListTile(
+                                    title: Text("#$id - $name"),
+                                    trailing:
+                                        paid
+                                            ? const Icon(
+                                              Icons.check_circle,
+                                              color: Colors.green,
+                                            )
+                                            : null,
+                                    onTap: () {
+                                      _setCurrentOrder(order);
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  "#${data?['orderId'] ?? ''} - ${data?['name'] ?? ''}",
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (data != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          "₹${(data['amount'] ?? 0).toString().replaceAll(RegExp(r'\.0+$'), '')}",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
+                ),
+              ),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _resetInactivityTimer,
+        onPanDown: (_) => _resetInactivityTimer(),
+        child: Stack(
+          children: [
+            if (isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (data == null)
+              const Center(child: Text("No payment QR available yet."))
+            else
+              _buildQrView(data),
+
+            // 🖼️ Placeholder overlay after inactivity
+            if (_showPlaceholder)
+              Positioned.fill(
                 child: GestureDetector(
                   onTap: () {
-                    if (_orderList.isEmpty) return;
-
-                    showModalBottomSheet(
-                      context: context,
-                      builder: (context) {
-                        return ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _orderList.length,
-                          separatorBuilder: (_, __) => const Divider(),
-                          itemBuilder: (context, index) {
-                            final order = _orderList[index];
-                            final id = order['orderId'];
-                            final name = order['name'] ?? '';
-                            final paid = order['paid'] == true;
-                            return ListTile(
-                              title: Text("#$id - $name"),
-                              trailing: paid
-                                  ? const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                              )
-                                  : null,
-                              onTap: () {
-                                _setCurrentOrder(order);
-                                Navigator.pop(context);
-                              },
-                            );
-                          },
-                        );
-                      },
-                    );
+                    setState(() => _showPlaceholder = false);
+                    _resetInactivityTimer();
                   },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            "#${data?['orderId'] ?? ''} - ${data?['name'] ?? ''}",
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.white70,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                      Image.asset(
+                        'assets/images/placeholder_2.jpg', // 👈 Fullscreen image
+                        fit: BoxFit.fitWidth,
                       ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.keyboard_arrow_down,
-                        color: Colors.white70,
-                        size: 20,
+                      Container(color: Colors.white.withOpacity(0.0)),
+                      Positioned(
+                        bottom: 50,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(
+                                  Icons.touch_app,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  "Tap anywhere to continue",
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-              if (data != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    "₹${(data['amount'] ?? 0).toString().replaceAll(RegExp(r'\.0+$'), '')}",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
+          ],
         ),
-        body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : data == null
-              ? const Center(child: Text("No payment QR available yet."))
-              : _buildQrView(data),
-      floatingActionButton: FloatingActionButton.small(
-        child: const Icon(Icons.print, color: Colors.white),
-        backgroundColor: Colors.black87,
-        onPressed: () async {
-          final devices = await PrinterHelper.getBondedDevices();
-          final prefs = await SharedPreferences.getInstance();
-          final lastAddress = prefs.getString("last_selected_printer");
+      ),
+      floatingActionButton:
+          _showPlaceholder
+              ? null
+              : FloatingActionButton.small(
+                child: const Icon(Icons.print, color: Colors.white),
+                backgroundColor: Colors.black87,
+                onPressed: () async {
+                  final devices = await PrinterHelper.getBondedDevices();
+                  final prefs = await SharedPreferences.getInstance();
+                  final lastAddress = prefs.getString("last_selected_printer");
 
-          if (devices.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("No paired printers found.")),
-            );
-            return;
-          }
+                  if (devices.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("No paired printers found."),
+                      ),
+                    );
+                    return;
+                  }
 
-          BluetoothDevice? defaultDevice;
-          try {
-            defaultDevice = devices.firstWhere((d) => d.address == lastAddress);
-          } catch (_) {
-            defaultDevice = null;
-          }
+                  BluetoothDevice? defaultDevice;
+                  try {
+                    defaultDevice = devices.firstWhere(
+                      (d) => d.address == lastAddress,
+                    );
+                  } catch (_) {
+                    defaultDevice = null;
+                  }
 
-          showModalBottomSheet(
-            context: context,
-            builder: (_) {
-              BluetoothDevice? selected = defaultDevice;
-              return StatefulBuilder(
-                builder: (context, setState) {
-                  return Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          "Printer Settings",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // 🔽 Dropdown with preselected default printer
-                        DropdownButton<BluetoothDevice>(
-                          isExpanded: true,
-                          hint: const Text("Select printer"),
-                          value: selected,
-                          items:
-                              devices
-                                  .map(
-                                    (d) => DropdownMenuItem(
-                                      value: d,
-                                      child: Text(d.name ?? "Unnamed Device"),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged: (val) => setState(() => selected = val),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 🔄 Auto Print toggle
-                        SwitchListTile(
-                          title: const Text("Auto Print"),
-                          value: _autoPrintEnabled,
-                          onChanged: (val) async {
-                            setState(() => _autoPrintEnabled = val);
-                            await _saveAutoPrintSetting(val);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  val
-                                      ? "✅ Auto Print Enabled"
-                                      : "❌ Auto Print Disabled",
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (_) {
+                      BluetoothDevice? selected = defaultDevice;
+                      return StatefulBuilder(
+                        builder: (context, setState) {
+                          return Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  "Printer Settings",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                                backgroundColor:
-                                    val ? Colors.green : Colors.orange,
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
+                                const SizedBox(height: 10),
 
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed:
-                                    selected == null
-                                        ? null
-                                        : () async {
-                                          await PrinterHelper.saveDefaultPrinter(
-                                            selected!,
-                                          );
-                                          Navigator.pop(context);
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                "✅ ${selected!.name ?? 'Printer'} set as default",
+                                // 🔽 Dropdown with preselected default printer
+                                DropdownButton<BluetoothDevice>(
+                                  isExpanded: true,
+                                  hint: const Text("Select printer"),
+                                  value: selected,
+                                  items:
+                                      devices
+                                          .map(
+                                            (d) => DropdownMenuItem(
+                                              value: d,
+                                              child: Text(
+                                                d.name ?? "Unnamed Device",
                                               ),
-                                              backgroundColor: Colors.green,
                                             ),
-                                          );
-                                        },
-                                icon: const Icon(Icons.save),
-                                label: const Text("Save"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
+                                          )
+                                          .toList(),
+                                  onChanged:
+                                      (val) => setState(() => selected = val),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => Navigator.pop(context),
-                                icon: const Icon(Icons.close),
-                                label: const Text("Close"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.black54,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
+                                const SizedBox(height: 16),
+
+                                // 🔄 Auto Print toggle
+                                SwitchListTile(
+                                  title: const Text("Auto Print"),
+                                  value: _autoPrintEnabled,
+                                  onChanged: (val) async {
+                                    setState(() => _autoPrintEnabled = val);
+                                    await _saveAutoPrintSetting(val);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          val
+                                              ? "✅ Auto Print Enabled"
+                                              : "❌ Auto Print Disabled",
+                                        ),
+                                        backgroundColor:
+                                            val ? Colors.green : Colors.orange,
+                                      ),
+                                    );
+                                  },
                                 ),
-                              ),
+                                const SizedBox(height: 16),
+
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed:
+                                            selected == null
+                                                ? null
+                                                : () async {
+                                                  await PrinterHelper.saveDefaultPrinter(
+                                                    selected!,
+                                                  );
+                                                  Navigator.pop(context);
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        "✅ ${selected!.name ?? 'Printer'} set as default",
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.green,
+                                                    ),
+                                                  );
+                                                },
+                                        icon: const Icon(Icons.save),
+                                        label: const Text("Save"),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 14,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => Navigator.pop(context),
+                                        icon: const Icon(Icons.close),
+                                        label: const Text("Close"),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.black54,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 14,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          );
+                        },
+                      );
+                    },
                   );
                 },
-              );
-            },
-          );
-        },
-      ),
+              ),
     );
   }
 
