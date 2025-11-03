@@ -81,7 +81,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
 
   void _resetInactivityTimer() {
     _inactivityTimer?.cancel();
-    _inactivityTimer = Timer(const Duration(seconds: 5), () {
+    _inactivityTimer = Timer(const Duration(minutes: 1), () {
       if (mounted) setState(() => _showPlaceholder = true);
     });
   }
@@ -110,7 +110,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     });
 
     // Stop loader after timeout
-    Future.delayed(const Duration(minutes: 1), () {
+    Future.delayed(const Duration(seconds: 5), () {
       if (mounted && isLoading) setState(() => isLoading = false);
     });
   }
