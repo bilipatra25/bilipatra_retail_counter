@@ -231,7 +231,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('User Details'),
+        title: const Text('Customer Details'),
         backgroundColor: Colors.green.shade600,
         foregroundColor: Colors.white,
       ),
