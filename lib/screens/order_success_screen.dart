@@ -47,9 +47,6 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
           order = OrderModelResponse.fromJson(res['data']);
           order?.orderId = widget.orderId.toString();
         });
-        if (_autoPrintEnabled && order != null) {
-          await _handleAutoPrint(order!);
-        }
       } else {
         showAppSnackBar(context, "Failed to load order details.");
       }
@@ -58,6 +55,9 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
       showAppSnackBar(context, "❌ Error loading order: $e");
     } finally {
       setState(() => _isLoading = false);
+    }
+    if (_autoPrintEnabled && order != null) {
+      await _handleAutoPrint(order!);
     }
   }
 
