@@ -455,7 +455,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                                 size: 20,
                               ),
                               label: Text(
-                                'Customer Details',
+                                'Customer',
                                 style: GoogleFonts.poppins(
                                   fontWeight: FontWeight.w500,
                                   fontSize: 15,
