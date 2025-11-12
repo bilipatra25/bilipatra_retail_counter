@@ -1,3 +1,4 @@
+import 'package:bilipatra_retail_counter/utils/globals.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -82,9 +83,7 @@ class _PrintScreenState extends State<PrintScreen> {
   // Connect and print invoice
   Future<void> _connectAndPrint() async {
     if (_selectedDevice == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Please select a printer.")));
+      showAppSnackBar(context, "Please select a printer.");
       return;
     }
 
@@ -99,15 +98,10 @@ class _PrintScreenState extends State<PrintScreen> {
 
       final printer = TestPrint();
       await printer.printInvoice(widget.order);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("✅ Printing started.")));
+      showAppSnackBar(context, "✅ Printing started.");
     } catch (e) {
       print(e);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("❌ Print failed: $e")));
+      showAppSnackBar(context, "❌ Print failed: $e");
     } finally {
       setState(() => _isLoading = false);
     }
@@ -124,7 +118,8 @@ class _PrintScreenState extends State<PrintScreen> {
       ),
       child: SingleChildScrollView(
         child: Column(
-          mainAxisSize: MainAxisSize.min, // important for bottom sheet
+          mainAxisSize: MainAxisSize.min,
+          // important for bottom sheet
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
@@ -151,25 +146,26 @@ class _PrintScreenState extends State<PrintScreen> {
                   onPressed: () {
                     showDialog(
                       context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text("How to Connect Printer"),
-                        content: const Text(
-                          "1. Power on your EZO Bluetooth printer.\n"
+                      builder:
+                          (_) => AlertDialog(
+                            title: const Text("How to Connect Printer"),
+                            content: const Text(
+                              "1. Power on your EZO Bluetooth printer.\n"
                               "2. Open your phone's Bluetooth settings.\n"
                               "3. Pair with the printer (name starts with 'EZO' or similar).\n"
                               "4. Come back and select the printer from the dropdown.\n\n"
                               "Once paired, it will be auto-selected next time.",
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text("Got it"),
-                          )
-                        ],
-                      ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text("Got it"),
+                              ),
+                            ],
+                          ),
                     );
                   },
-                )
+                ),
               ],
             ),
 
@@ -177,22 +173,23 @@ class _PrintScreenState extends State<PrintScreen> {
             _devices.isEmpty
                 ? Text(_statusMessage)
                 : DropdownButton<BluetoothDevice>(
-              isExpanded: true,
-              value: _selectedDevice,
-              hint: const Text("Select a printer"),
-              items: _devices.map((device) {
-                return DropdownMenuItem(
-                  value: device,
-                  child: Text(device.name ?? "Unnamed Device"),
-                );
-              }).toList(),
-              onChanged: (val) {
-                setState(() {
-                  _selectedDevice = val;
-                });
-                if (val != null) _saveSelectedDevice(val);
-              },
-            ),
+                  isExpanded: true,
+                  value: _selectedDevice,
+                  hint: const Text("Select a printer"),
+                  items:
+                      _devices.map((device) {
+                        return DropdownMenuItem(
+                          value: device,
+                          child: Text(device.name ?? "Unnamed Device"),
+                        );
+                      }).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedDevice = val;
+                    });
+                    if (val != null) _saveSelectedDevice(val);
+                  },
+                ),
             const SizedBox(height: 16),
             if (_isLoading)
               const Padding(
@@ -221,7 +218,9 @@ class _PrintScreenState extends State<PrintScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.pop(context); // This closes the current screen or bottom sheet
+                      Navigator.pop(
+                        context,
+                      ); // This closes the current screen or bottom sheet
                     },
                     icon: const Icon(Icons.close),
                     label: const Text("Close"),

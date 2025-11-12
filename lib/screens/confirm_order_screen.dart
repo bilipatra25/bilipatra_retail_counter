@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../utils/constants.dart';
+import '../utils/globals.dart';
 // import 'dart:html' as html;
 
 class ConfirmOrderScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
   OrderType _selectedOrderType = OrderType.cash;
   double discountPercent = 0.0;
   final TextEditingController _discountController = TextEditingController();
+
   Future<void> _placeOrder(user, products) async {
     setState(() => _isLoading = true);
 
@@ -30,15 +32,14 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                 (p) => {
                   "product_id": p.id,
                   "qty": p.quantity,
-                  "unit": "pcs",
-                  // "discount": 0,
+                  "unit": "pcs", // "discount": 0,
                 },
               )
               .toList();
 
       final data = {
         "order_type": _selectedOrderType.value,
-        "discount_percent":discountPercent,
+        "discount_percent": discountPercent,
         // "order_status": "pending",
         // "GST_amount": 0,
         // // or calculate accordingly
@@ -55,6 +56,7 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
       final orderData = await api.placeOrder(data);
 
       if (_selectedOrderType == OrderType.cash) {
+        Provider.of<AppProvider>(context, listen: false).clearCart();
         context.goNamed(
           'orderSuccess',
           pathParameters: {'orderId': orderData['order_id'].toString()},
@@ -70,9 +72,7 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
       }
     } catch (e) {
       print(e);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("❌ Order failed: $e")));
+      showAppSnackBar(context, "❌ Order failed: $e");
     } finally {
       setState(() => _isLoading = false);
     }
@@ -320,13 +320,21 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 12.0, top: 6),
+                            padding: const EdgeInsets.only(
+                              bottom: 12.0,
+                              top: 6,
+                            ),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.green.shade200),
+                                border: Border.all(
+                                  color: Colors.green.shade200,
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,17 +354,18 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   SegmentedButton<OrderType>(
-                                    segments: OrderType.values.map((type) {
-                                      return ButtonSegment<OrderType>(
-                                        value: type,
-                                        label: Text(type.label),
-                                        icon: Icon(
-                                          type == OrderType.online
-                                              ? Icons.qr_code_2
-                                              : Icons.attach_money_rounded,
-                                        ),
-                                      );
-                                    }).toList(),
+                                    segments:
+                                        OrderType.values.map((type) {
+                                          return ButtonSegment<OrderType>(
+                                            value: type,
+                                            label: Text(type.label),
+                                            icon: Icon(
+                                              type == OrderType.online
+                                                  ? Icons.qr_code_2
+                                                  : Icons.attach_money_rounded,
+                                            ),
+                                          );
+                                        }).toList(),
                                     selected: <OrderType>{_selectedOrderType},
                                     onSelectionChanged: (newSelection) {
                                       setState(() {
@@ -364,22 +373,32 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                       });
                                     },
                                     style: ButtonStyle(
-                                      backgroundColor: WidgetStateProperty.resolveWith((states) {
-                                        if (states.contains(WidgetState.selected)) {
-                                          return Colors.green.shade200;
-                                        }
-                                        return Colors.white;
-                                      }),
-                                      foregroundColor: WidgetStateProperty.all(Colors.black87),
+                                      backgroundColor:
+                                          WidgetStateProperty.resolveWith((
+                                            states,
+                                          ) {
+                                            if (states.contains(
+                                              WidgetState.selected,
+                                            )) {
+                                              return Colors.green.shade200;
+                                            }
+                                            return Colors.white;
+                                          }),
+                                      foregroundColor: WidgetStateProperty.all(
+                                        Colors.black87,
+                                      ),
                                       padding: WidgetStateProperty.all(
-                                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          )
+                          ),
                         ],
                       ),
                     ),
@@ -425,7 +444,7 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                                       // );
                                       //
                                       // if (confirm ?? false) {
-                                        await _placeOrder(user, products);
+                                      await _placeOrder(user, products);
                                       // }
                                     } else {
                                       // Directly place order or redirect for other order types

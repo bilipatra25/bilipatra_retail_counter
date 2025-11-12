@@ -1,12 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../PrintScreen.dart';
 import '../models/order_model.dart';
-import '../providers/app_provider.dart';
 import '../services/api_service.dart';
+import '../utils/PrinterHelper.dart';
+import '../utils/globals.dart';
 import 'invoice_webview_screen.dart';
 
 class OrderSuccessScreen extends StatefulWidget {
@@ -21,11 +21,20 @@ class OrderSuccessScreen extends StatefulWidget {
 class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
   bool _isLoading = true;
   OrderModelResponse? order;
+  bool _autoPrintEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    _loadAutoPrintSetting();
     _loadOrderDetails();
+  }
+
+  Future<void> _loadAutoPrintSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _autoPrintEnabled = prefs.getBool("auto_print_enabled") ?? true;
+    });
   }
 
   Future<void> _loadOrderDetails() async {
@@ -37,47 +46,36 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
         setState(() {
           order = OrderModelResponse.fromJson(res['data']);
         });
+        if (_autoPrintEnabled && order != null) {
+          await _handleAutoPrint(order!);
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to load order details.")),
-        );
+        showAppSnackBar(context, "Failed to load order details.");
       }
     } catch (e) {
       print("❌ Error loading order: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("❌ Error loading order: $e")));
+      showAppSnackBar(context, "❌ Error loading order: $e");
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _handlePrintInvoice(user, products) async {
-    /*setState(() => _isLoading = true);
-    try {
-      await InvoiceGeneratorEzo.generateInvoicePdf(user, products);
-    } catch (e) {
-      debugPrint("Error generating PDF: $e");
-    } finally {
-      setState(() => _isLoading = false);
-    }*/
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (_) => PrintScreen(user: user, products: products),
-    //   ),
-    // );
-  }
+  Future<void> _handleAutoPrint(OrderModelResponse loadedOrder) async {
+    // ✅ Proceed with print
+    final success = await PrinterHelper.printInvoice(loadedOrder);
+    if (success) {
+      debugPrint("🟢 Order ${loadedOrder.invoiceNumber} printed successfully");
+    } else {
+      debugPrint("🔴 Failed to print order ${loadedOrder.invoiceNumber}");
+    }
 
-  Future<void> _generatePdfInBackground(user, products) async {
-    await compute(generatePdfTask, {'user': user, 'products': products});
-  }
-
-  // Place this at the top level of your file or in another utils file
-  Future<void> generatePdfTask(Map<String, dynamic> args) async {
-    final user = args['user'];
-    final products = args['products'];
-    // await InvoiceGenerator.generateInvoicePdf(user, products);
+    if (mounted) {
+      showAppSnackBar(
+        context,
+        success ? "✅ Invoice printed" : "⚠️ Print failed. Check printer.",
+        success: success,
+      );
+    }
   }
 
   @override
@@ -91,6 +89,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
         return false; // prevent default pop
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           title: const Text("Order Placed"),
           backgroundColor: Colors.green,
@@ -375,7 +374,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                   onPressed: () async {
                     // final confirm = await showConfirmHomeDialog(context);
                     // if (confirm) {
-                      context.go('/');
+                    context.go('/');
                     // }
                   },
                   icon: const Icon(Icons.home),

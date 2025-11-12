@@ -346,12 +346,11 @@ class ApiService {
 
   ///Example Ends ------
 
-  Future<Map<String, dynamic>> userSelectByMobileNo(
-    String mobile,
-  ) async {
-    return await _postRequest("retailcounter_customer/v1/apiuserselectbymobileno", {
-      'mobile_no': int.parse(mobile),
-    });
+  Future<Map<String, dynamic>> userSelectByMobileNo(String mobile) async {
+    return await _postRequest(
+      "retailcounter_customer/v1/apiuserselectbymobileno",
+      {'mobile_no': int.parse(mobile)},
+    );
   }
 
   Future<Map<String, dynamic>> customerLogin(
@@ -367,9 +366,9 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> saveFcmToken(
-       String deviceId,
-       String fcmToken,
-       String platform,
+    String deviceId,
+    String fcmToken,
+    String platform,
   ) async {
     return await _postRequest("retail_fcm_token/v1/saveretailfcmtoken", {
       'device_id': deviceId,
@@ -398,11 +397,14 @@ class ApiService {
   }
 
   Future<List<ProductModel>> productList(int pageIndex, int pageSize) async {
-    final response = await _postRequest("retail_product_detail/v1/retail_apiselectall", {
-      'pageIndex': pageIndex,
-      'pageSize': pageSize,
-      'searchParam': {'global_search': '', 'product_name': ''},
-    });
+    final response = await _postRequest(
+      "retail_product_detail/v1/retail_apiselectall",
+      {
+        'pageIndex': pageIndex,
+        'pageSize': pageSize,
+        'searchParam': {'global_search': '', 'product_name': ''},
+      },
+    );
     if (response['flag'] == 1 && response['code'] == 200) {
       final List<dynamic> results = response['data']['result'];
       return results.map((product) => ProductModel.fromJson(product)).toList();
@@ -411,15 +413,18 @@ class ApiService {
     }
   }
 
-  Future<TotalOrderReport?> fetchTotalOrderReport(String start_date, String end_date) async {
-    final response = await _postRequest("retailcounter_order/v1/TotalOrderReport", {
-      'start_date': start_date,
-      'end_date': end_date
-    });
+  Future<TotalOrderReport?> fetchTotalOrderReport(
+    String start_date,
+    String end_date,
+  ) async {
+    final response = await _postRequest(
+      "retailcounter_order/v1/TotalOrderReport",
+      {'start_date': start_date, 'end_date': end_date},
+    );
     if (response['flag'] == 1 && response['code'] == 200) {
       return TotalOrderReport.fromJson(response);
-      }
-      return null;
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> data) async {
@@ -434,11 +439,9 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> orderList(int page,int limit) async {
+  Future<Map<String, dynamic>> orderList(int page, int limit) async {
     return await _postRequest("retailcounter_order/v1/orderlist", {
-      'page': page,
-      'limit': limit,
-      // 'from_date': from_date,
+      'page': page, 'limit': limit, // 'from_date': from_date,
       // 'to_date': to_date,
     });
   }

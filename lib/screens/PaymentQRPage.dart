@@ -1,21 +1,23 @@
 import 'dart:async';
+
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+
 import '../PrintScreen.dart';
+import '../models/order_model.dart';
 import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../utils/PrinterHelper.dart';
 import '../utils/globals.dart';
-import '../models/order_model.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 class PaymentQRPage extends StatefulWidget {
   const PaymentQRPage({Key? key}) : super(key: key);
@@ -212,9 +214,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       debugPrint("❌ Error during order fetch/print: $e");
       if (mounted) {
         setState(() => isOrderLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("❌ Error: $e")));
+        showAppSnackBar(context, "❌ Error: $e");
       }
     }
   }
@@ -460,11 +460,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                   final lastAddress = prefs.getString("last_selected_printer");
 
                   if (devices.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("No paired printers found."),
-                      ),
-                    );
+                    showAppSnackBar(context, "No paired printers found.");
                     return;
                   }
 
@@ -525,16 +521,12 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                                   onChanged: (val) async {
                                     setState(() => _autoPrintEnabled = val);
                                     await _saveAutoPrintSetting(val);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          val
-                                              ? "✅ Auto Print Enabled"
-                                              : "❌ Auto Print Disabled",
-                                        ),
-                                        backgroundColor:
-                                            val ? Colors.green : Colors.orange,
-                                      ),
+                                    showAppSnackBar(
+                                      context,
+                                      val
+                                          ? "✅ Auto Print Enabled"
+                                          : "❌ Auto Print Disabled",
+                                      success: val,
                                     );
                                   },
                                 ),
@@ -552,16 +544,10 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
                                                     selected!,
                                                   );
                                                   Navigator.pop(context);
-                                                  ScaffoldMessenger.of(
+                                                  showAppSnackBar(
                                                     context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        "✅ ${selected!.name ?? 'Printer'} set as default",
-                                                      ),
-                                                      backgroundColor:
-                                                          Colors.green,
-                                                    ),
+                                                    "✅ ${selected!.name ?? 'Printer'} set as default",
+                                                    success: true,
                                                   );
                                                 },
                                         icon: const Icon(Icons.save),
@@ -631,9 +617,7 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
               child: ElevatedButton.icon(
                 onPressed: () async {
                   if (order == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("⚠️ Order not loaded yet.")),
-                    );
+                    showAppSnackBar(context, "⚠️ Order not loaded yet.");
                     return;
                   }
                   showModalBottomSheet(
@@ -853,14 +837,11 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
   }
 
   void _handleOrderDelivered(RemoteMessage message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Your order has been delivered successfully!"),
-      ),
-    );
+    showAppSnackBar(context, "Your order has been delivered successfully!");
   }
 
   void _navigateToSuccess(BuildContext context, data) {
+    Provider.of<AppProvider>(context, listen: false).clearCart();
     context.pushNamed(
       'orderSuccess',
       pathParameters: {'orderId': data.toString()},
@@ -911,13 +892,10 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success ? "✅ Invoice printed" : "⚠️ Print failed. Check printer.",
-          ),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
+      showAppSnackBar(
+        context,
+        success ? "✅ Invoice printed" : "⚠️ Print failed. Check printer.",
+        success: success,
       );
     }
   }

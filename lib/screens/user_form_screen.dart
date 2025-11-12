@@ -6,13 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../models/TotalOrderReport.dart';
 import '../models/order.dart';
-import '../models/order_model.dart';
 import '../models/user.dart';
 import '../providers/app_provider.dart';
-import '../utils/constants.dart';
-import 'PaymentQRPage.dart';
+import '../utils/globals.dart';
 
 class UserFormScreen extends StatefulWidget {
   const UserFormScreen({super.key});
@@ -30,31 +27,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
   bool isLoading = false;
 
-  TotalOrderReport? report;
-  bool isDashboardLoading = false;
-  DateTimeRange? customRange;
-  DateFilter _selectedFilter = DateFilter.today;
-
   @override
   void initState() {
     super.initState();
     _apiService = ApiService(context);
-    Provider.of<AppProvider>(context, listen: false).clearCart();
+    // Provider.of<AppProvider>(context, listen: false).clearCart();
     _initFcmToken();
-    _applyFilter(_selectedFilter);
-  }
-
-  void _loadData(String startDate, String endDate) async {
-    setState(() {
-      isDashboardLoading = true;
-    });
-
-    final data = await _apiService.fetchTotalOrderReport(startDate, endDate);
-
-    setState(() {
-      report = data;
-      isDashboardLoading = false;
-    });
   }
 
   Future<String> getDeviceId() async {
@@ -194,11 +172,30 @@ class _UserFormScreenState extends State<UserFormScreen> {
         });
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(response['message'] ?? 'Customer not found')),
-      );
+      showAppSnackBar(context, response['message'] ?? 'Customer not found');
     }
   }
+
+  // void _skipToProducts() {
+  //   // Create a temporary "Quick Customer" UserModel
+  //   final quickCustomer = UserModel(
+  //     id: 0, // temporary ID (not from API)
+  //     name: 'Quick Customer',
+  //     number: '99999${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+  //     address: 'Quick Checkout',
+  //   );
+  //
+  //   // Store in Provider just like the normal login flow
+  //   Provider.of<AppProvider>(context, listen: false).setUser(quickCustomer);
+  //
+  //   // Optionally show a small toast/snackbar
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(content: Text('Quick Checkout mode enabled')),
+  //   );
+  //
+  //   // Navigate directly to Product Page
+  //   context.push('/products');
+  // }
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
@@ -216,233 +213,27 @@ class _UserFormScreenState extends State<UserFormScreen> {
           // ScaffoldMessenger.of(context).showSnackBar(
           //   SnackBar(content: Text(response['message'] ?? 'Login Successful')),
           // );
-          context.push('/products');
+          context.push('/confirm');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(response['message'] ?? 'Login failed')),
-          );
+          showAppSnackBar(context, response['message'] ?? 'Login failed');
         }
       } catch (e, stack) {
         print("❌ Error: $e");
         print(stack);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Something went wrong!")));
+        showAppSnackBar(context, "Something went wrong!");
       } finally {
         setState(() => isLoading = false);
       }
     }
   }
 
-  void _applyFilter(DateFilter filter) async {
-    setState(() {
-      _selectedFilter = filter;
-      isDashboardLoading = true;
-    });
-
-    final today = DateTime.now();
-    String startDate = "";
-    String endDate = "";
-
-    switch (filter) {
-      case DateFilter.today:
-        startDate =
-            endDate =
-                "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
-        break;
-
-      case DateFilter.yesterday:
-        final yesterday = today.subtract(const Duration(days: 1));
-        startDate =
-            endDate =
-                "${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}";
-        break;
-
-      case DateFilter.thisMonth:
-        startDate =
-            "${today.year}-${today.month.toString().padLeft(2, '0')}-01";
-        endDate =
-            "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
-        break;
-
-      case DateFilter.lifetime:
-        // earliest possible start date
-        startDate = "2000-01-01";
-        endDate =
-            "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
-        break;
-
-      case DateFilter.custom:
-        final picked = await showDateRangePicker(
-          context: context,
-          firstDate: DateTime(2000),
-          lastDate: DateTime.now(),
-          initialDateRange: DateTimeRange(
-            start: today.subtract(const Duration(days: 7)),
-            end: today,
-          ),
-        );
-
-        if (picked != null) {
-          startDate =
-              "${picked.start.year}-${picked.start.month.toString().padLeft(2, '0')}-${picked.start.day.toString().padLeft(2, '0')}";
-          endDate =
-              "${picked.end.year}-${picked.end.month.toString().padLeft(2, '0')}-${picked.end.day.toString().padLeft(2, '0')}";
-        } else {
-          setState(() {
-            isDashboardLoading = false; // cancel custom selection
-          });
-          return;
-        }
-        break;
-    }
-
-    _fetchReport(startDate, endDate);
-  }
-
-  Future<void> _fetchReport(String start, String end) async {
-    final data = await _apiService.fetchTotalOrderReport(start, end);
-    setState(() {
-      report = data;
-      isDashboardLoading = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white, // white background
-        elevation: 0, // optional: remove shadow for a clean look
-        title: Row(
-          children: [
-            Image.asset("assets/logo_min.png", height: 32),
-            const SizedBox(width: 8),
-            const Text(
-              "Bilipatra Retail Counter",
-              style: TextStyle(
-                color: Colors.green, // green text
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        iconTheme: const IconThemeData(
-          color: Colors.green,
-        ), // for menu/drawer icon
-      ),
-      endDrawer: Drawer(
-        backgroundColor: Colors.green.shade50, // lightest green background
-        child: SafeArea(
-          child:
-              isDashboardLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Dashboard",
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            ChoiceChip(
-                              label: const Text("Today"),
-                              selected: _selectedFilter == DateFilter.today,
-                              onSelected: (_) => _applyFilter(DateFilter.today),
-                            ),
-                            ChoiceChip(
-                              label: const Text("Yesterday"),
-                              selected: _selectedFilter == DateFilter.yesterday,
-                              onSelected:
-                                  (_) => _applyFilter(DateFilter.yesterday),
-                            ),
-                            ChoiceChip(
-                              label: const Text("This Month"),
-                              selected: _selectedFilter == DateFilter.thisMonth,
-                              onSelected:
-                                  (_) => _applyFilter(DateFilter.thisMonth),
-                            ),
-                            ChoiceChip(
-                              label: const Text("Lifetime"),
-                              selected: _selectedFilter == DateFilter.lifetime,
-                              onSelected:
-                                  (_) => _applyFilter(DateFilter.lifetime),
-                            ),
-                            ChoiceChip(
-                              label: const Text("Custom"),
-                              selected: _selectedFilter == DateFilter.custom,
-                              onSelected:
-                                  (_) => _applyFilter(DateFilter.custom),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildStatCard(
-                          title: "Total Orders",
-                          value: "${report?.totalOrder ?? 0}",
-                          icon: Icons.shopping_cart,
-                          color: Colors.orange,
-                        ),
-                        _buildStatCard(
-                          title: "Total Amount",
-                          value: "₹ ${report?.totalAmount ?? '0'}",
-                          icon: Icons.attach_money,
-                          color: Colors.green,
-                        ),
-                        _buildStatCard(
-                          title: "Cash Orders",
-                          value:
-                              "${report?.cashOrderCount ?? 0} (₹ ${report?.cashAmount ?? '0'})",
-                          icon: Icons.payments,
-                          color: Colors.blue,
-                        ),
-                        _buildStatCard(
-                          title: "Online Orders",
-                          value:
-                              "${report?.onlineOrderCount ?? 0} (₹ ${report?.onlineAmount ?? '0'})",
-                          icon: Icons.credit_card,
-                          color: Colors.purple,
-                        ),
-
-                        const SizedBox(height: 24),
-                        const Divider(),
-
-                        // ✅ New Option: Open Payment QR Activity
-                        ListTile(
-                          leading: const Icon(
-                            Icons.qr_code,
-                            color: Colors.green,
-                          ),
-                          title: const Text(
-                            "Open Payment QR",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          onTap: () {
-                            Navigator.pop(context); // close drawer first
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const PaymentQRPage(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-        ),
+        title: const Text('User Details'),
+        backgroundColor: Colors.green.shade600,
+        foregroundColor: Colors.white,
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -476,19 +267,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
                       ),
                       const SizedBox(height: 20),
                       TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Full Name',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator:
-                            (value) =>
-                                value == null || value.isEmpty
-                                    ? 'Required'
-                                    : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
                         controller: _numberController,
                         keyboardType: TextInputType.phone,
                         decoration: InputDecoration(
@@ -510,6 +288,19 @@ class _UserFormScreenState extends State<UserFormScreen> {
                         onChanged: (value) {
                           fetchCustomerByMobile(value);
                         },
+                        validator:
+                            (value) =>
+                                value == null || value.isEmpty
+                                    ? 'Required'
+                                    : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Full Name',
+                          border: OutlineInputBorder(),
+                        ),
                         validator:
                             (value) =>
                                 value == null || value.isEmpty
@@ -548,11 +339,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                                     ),
                                   )
                                   : const Icon(Icons.arrow_forward),
-                          label: Text(
-                            isLoading
-                                ? 'Please wait...'
-                                : 'Continue to Products',
-                          ),
+                          label: Text(isLoading ? 'Please wait...' : 'Submit'),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             backgroundColor: Colors.green,
