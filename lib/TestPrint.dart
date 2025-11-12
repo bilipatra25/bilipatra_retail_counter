@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:bilipatra_retail_counter/printerenum.dart';
+import 'package:bilipatra_retail_counter/services/api_service.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -266,7 +267,7 @@ class TestPrint {
 
     bluetooth.printNewLine();
     bluetooth.printCustom("Scan below to view digital bill", Size.medium.val, Align.center.val);
-    final billUrl = "https://bilipatra.com";
+    final billUrl = "${ApiService.baseUrl}/invoice/internal-invoice-preview?order_id=${order.orderId.toString()}";
     await bluetooth.printQRcode(billUrl, 200, 200, Align.center.val);
     await Future.delayed(const Duration(milliseconds: 400));
 

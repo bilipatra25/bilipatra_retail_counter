@@ -45,6 +45,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
       if (res['flag'] == 1 && res['data'] != null) {
         setState(() {
           order = OrderModelResponse.fromJson(res['data']);
+          order?.orderId = widget.orderId.toString();
         });
         if (_autoPrintEnabled && order != null) {
           await _handleAutoPrint(order!);

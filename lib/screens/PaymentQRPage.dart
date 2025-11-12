@@ -826,7 +826,9 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
       final res = await api.orderListById(orderId.toString());
 
       if (res['flag'] == 1 && res['data'] != null) {
-        return OrderModelResponse.fromJson(res['data']);
+        OrderModelResponse? order = OrderModelResponse.fromJson(res['data']);
+        order.orderId = orderId.toString();
+        return order;
       } else {
         return null;
       }

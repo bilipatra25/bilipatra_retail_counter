@@ -1,6 +1,7 @@
 import 'order_product.dart';
 
 class OrderModelResponse {
+  String orderId;
   final String customerName;
   final String mobileNo;
   final String address;
@@ -16,6 +17,7 @@ class OrderModelResponse {
   final List<OrderProduct> productList;
 
   OrderModelResponse({
+    required this.orderId,
     required this.customerName,
     required this.mobileNo,
     required this.address,
@@ -37,6 +39,7 @@ class OrderModelResponse {
     final summary = json['summary'] ?? {};
 
     return OrderModelResponse(
+      orderId: customer['order_id'] ?? '',
       customerName: customer['name'] ?? '',
       mobileNo: customer['contact'] ?? '',
       address: customer['address'] ?? '',
