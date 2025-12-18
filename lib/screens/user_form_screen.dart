@@ -172,7 +172,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
         });
       }
     } else {
-      showAppSnackBar(context, response['message'] ?? 'Customer not found');
+      // showAppSnackBar(context, response['message'] ?? 'Customer not found');
     }
   }
 
