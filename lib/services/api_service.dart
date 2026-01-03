@@ -451,6 +451,18 @@ class ApiService {
       'order_id': orderId,
     });
   }
+
+  Future<Map<String, dynamic>> sendWholesaleInquiry({
+    required String customerName,
+    required String mobileNo,
+    required String address,
+  }) async {
+    return await _postRequest("retailcounter_customer/v1/sendwholesaleinquiry", {
+      "customer_name": customerName,
+      "mobile_no": mobileNo,
+      "address": address,
+    });
+  }
 }
 
 // Custom API Exception

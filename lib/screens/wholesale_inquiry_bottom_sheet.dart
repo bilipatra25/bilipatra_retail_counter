@@ -1,3 +1,4 @@
+import 'package:bilipatra_retail_counter/utils/globals.dart';
 import 'package:flutter/material.dart';
 import '../models/order.dart';
 import '../services/api_service.dart';
@@ -25,6 +26,7 @@ class _WholesaleInquiryBottomSheetState
 
   bool _isLoading = false;
   bool _hasMore = true;
+  bool _isSubmitting = false;
 
   final List<Order> _orders = [];
 
@@ -208,15 +210,21 @@ class _WholesaleInquiryBottomSheetState
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        onPressed: () {
-          if (_formKey.currentState!.validate()) {
-            Navigator.pop(context);
-          }
-        },
-        child: const Text(
-          "Continue",
-          style: TextStyle(fontSize: 16, color: Colors.white),
-        ),
+        onPressed: _isSubmitting ? null : _submitWholesaleInquiry,
+        child:
+            _isSubmitting
+                ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+                : const Text(
+                  "Continue",
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
       ),
     );
   }
@@ -255,5 +263,40 @@ class _WholesaleInquiryBottomSheetState
         borderRadius: BorderRadius.circular(2),
       ),
     );
+  }
+
+  Future<void> _submitWholesaleInquiry() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final api = ApiService(widget.parentContext);
+
+      final response = await api.sendWholesaleInquiry(
+        customerName: _nameController.text.trim(),
+        mobileNo: _mobileController.text.trim(),
+        address: _addressController.text.trim(),
+      );
+
+      if (response['success'] == true || response['flag'] == 1) {
+        if (mounted) {
+          Navigator.pop(context);
+
+          ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+            const SnackBar(
+              content: Text("Wholesale inquiry sent successfully"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        showAppSnackBar(context, "Failed to send inquiry");
+      }
+    } catch (e) {
+      showAppSnackBar(context, "Something went wrong. Please try again");
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 }
