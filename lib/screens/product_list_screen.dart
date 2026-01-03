@@ -1,3 +1,4 @@
+import 'package:bilipatra_retail_counter/screens/wholesale_inquiry_bottom_sheet.dart';
 import 'package:bilipatra_retail_counter/utils/globals.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../models/TotalOrderReport.dart';
+import '../models/order.dart';
 import '../models/product.dart';
 import '../providers/app_provider.dart';
 import '../services/api_service.dart';
@@ -483,6 +485,22 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   ),
                 ),
               ),
+      floatingActionButton: FloatingActionButton.extended(
+        label: const Text("Wholesale Inquiry"),
+        icon: const Icon(Icons.warehouse),
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            builder: (_) => WholesaleInquiryBottomSheet(parentContext: context),
+          );
+        },
+      ),
     );
   }
 
