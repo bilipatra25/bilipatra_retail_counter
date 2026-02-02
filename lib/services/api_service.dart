@@ -463,6 +463,27 @@ class ApiService {
       "address": address,
     });
   }
+
+  Future<Map<String, String>> fetchAppConfig() async {
+    final response = await _postRequest(
+      '/configuration/v1/apiselectall',
+      {
+        "pageIndex": 1,
+        "pageSize": 20,
+      },
+    );
+
+    final List list = response['data']['result'];
+
+    final Map<String, String> config = {};
+
+    for (var item in list) {
+      config[item['configuration_key']] =
+          item['configuration_value'].toString();
+    }
+
+    return config;
+  }
 }
 
 // Custom API Exception

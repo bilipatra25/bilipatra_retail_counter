@@ -3,7 +3,9 @@ import 'package:bilipatra_retail_counter/utils/globals.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/TotalOrderReport.dart';
 import '../models/order.dart';
@@ -40,6 +42,156 @@ class _ProductListScreenState extends State<ProductListScreen> {
     _loadProducts();
     _scrollController.addListener(_scrollListener);
     _applyFilter(_selectedFilter);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAppUpdate();
+    });
+  }
+
+  Future<void> _checkAppUpdate() async {
+    try {
+      final config = await _apiService.fetchAppConfig();
+      final info = await PackageInfo.fromPlatform();
+
+      final String currentVersion = info.version;
+      final String minVersion =
+          config['retail_app_minimum_version'] ?? '0.0.0';
+      final String latestVersion =
+          config['retail_app_version'] ?? '0.0.0';
+      final String apkUrl = config['retail_app_url'] ?? '';
+
+      debugPrint(
+        '\x1B[34mCurrent: $currentVersion | Min: $minVersion | Latest: $latestVersion\x1B[0m',
+      );
+
+      // 🔴 Force update
+      if (compareVersions(currentVersion, minVersion) < 0) {
+        _showUpdateBottomSheet(
+          forceUpdate: true,
+          apkUrl: apkUrl,
+        );
+        return;
+      }
+
+      // 🟡 Optional update
+      if (compareVersions(currentVersion, latestVersion) < 0) {
+        _showUpdateBottomSheet(
+          forceUpdate: false,
+          apkUrl: apkUrl,
+        );
+      }
+    } catch (e) {
+      debugPrint("Update check failed: $e");
+    }
+  }
+
+  int compareVersions(String v1, String v2) {
+    final v1Parts = v1.split('.').map(int.parse).toList();
+    final v2Parts = v2.split('.').map(int.parse).toList();
+
+    final maxLength = v1Parts.length > v2Parts.length
+        ? v1Parts.length
+        : v2Parts.length;
+
+    for (int i = 0; i < maxLength; i++) {
+      final v1Part = i < v1Parts.length ? v1Parts[i] : 0;
+      final v2Part = i < v2Parts.length ? v2Parts[i] : 0;
+
+      if (v1Part > v2Part) return 1;
+      if (v1Part < v2Part) return -1;
+    }
+    return 0; // equal
+  }
+
+  void _showUpdateBottomSheet({
+    required bool forceUpdate,
+    required String apkUrl,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: !forceUpdate,
+      enableDrag: !forceUpdate,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.system_update,
+                size: 60,
+                color: Colors.green.shade700,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "App Update Available",
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                forceUpdate
+                    ? "You must update the app to continue using it."
+                    : "A new version is available with improvements.",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  if (!forceUpdate)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Later"),
+                      ),
+                    ),
+                  if (!forceUpdate) const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _openApk(apkUrl),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text("Update Now"),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openApk(String url) async {
+    try {
+      final uri = Uri.parse(url);
+
+      // First try: open in browser (MOST RELIABLE)
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.platformDefault,
+      );
+
+      if (!launched) {
+        // Fallback: external app
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+      }
+    } catch (e) {
+      debugPrint("Failed to open APK url: $e");
+      showAppSnackBar(context, "Unable to open update link");
+    }
   }
 
   Future<void> _loadProducts() async {
