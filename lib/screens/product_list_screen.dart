@@ -221,7 +221,10 @@ class _ProductListScreenState extends State<ProductListScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child:
             _error != null
-                ? Center(child: Text("Error: $_error"))
+                ? _buildErrorState(
+                  message: _error!,
+                  onRetry: _retryLoadProducts,
+                )
                 : GridView.builder(
                   controller: _scrollController,
                   itemCount: _products.length + (_hasMore ? 1 : 0),
@@ -500,6 +503,71 @@ class _ProductListScreenState extends State<ProductListScreen> {
             builder: (_) => WholesaleInquiryBottomSheet(parentContext: context),
           );
         },
+      ),
+    );
+  }
+
+  void _retryLoadProducts() {
+    setState(() {
+      _error = null;
+      _products.clear();
+      _currentPage = 1;
+      _hasMore = true;
+    });
+    _loadProducts();
+  }
+
+  Widget _buildErrorState({
+    required String message,
+    required VoidCallback onRetry,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/images/placeholder.png', // 👈 add your image here
+              height: 160,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              "Something went wrong",
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.red.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text("Retry"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
