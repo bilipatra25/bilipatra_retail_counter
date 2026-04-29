@@ -102,80 +102,171 @@ class _UserFormScreenState extends State<UserFormScreen> {
   Future<void> fetchCustomerByMobile(String mobile) async {
     if (mobile.length != 10) return;
 
-    final response = await _apiService.userSelectByMobileNo(
-      _numberController.text.trim(),
-    );
+    final response = await _apiService.userSelectByMobileNo(mobile);
 
-    if (response['flag'] == 1 &&
-        response['data'] != null &&
-        response['data'].isNotEmpty) {
-      final customer = response['data'][0];
+    if (response['flag'] == 1 && response['data'] != null) {
+      final customer = response['data'];
 
-      // Handle nulls safely
-      final customerName = customer['customer_name'] ?? 'N/A';
-      final customerMobile = customer['mobile_no'] ?? 'N/A';
-      final customerAddress = customer['address'] ?? 'N/A';
-      final totalOrders = customer['total_orders'] ?? 0;
-      final isRepeat = totalOrders > 0;
+      // Data Extraction
+      final String name = customer['name'] ?? 'N/A';
+      final String primaryMobile = customer['mobile'] ?? 'N/A';
+      final String channel = customer['channel'] ?? 'N/A';
+      // Mapping the new key: ordersCount
+      final int ordersCount = customer['ordersCount'] ?? 0;
 
-      final confirmed = await showDialog<bool>(
+      await showDialog<bool>(
         context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('Use Existing Customer?'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Name: $customerName'),
-                  Text('Phone: $customerMobile'),
-                  Text('Address: $customerAddress'),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        isRepeat
-                            ? 'Repeat Customer ($totalOrders orders)'
-                            : 'New Customer',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: isRepeat ? Colors.red : Colors.green,
-                        ),
-                      ),
-                      if (isRepeat)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 8),
-                          child: Icon(Icons.star, color: Colors.red, size: 18),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Confirm'),
-                ),
-              ],
-            ),
-      );
+        barrierDismissible: false,
+        builder: (context) {
+          final size = MediaQuery.of(context).size;
+          final isTablet = size.width > 600;
+          final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
-      if (confirmed == true) {
-        setState(() {
-          _nameController.text = customerName;
-          _addressController.text = customerAddress;
-        });
-      }
-    } else {
-      // showAppSnackBar(context, response['message'] ?? 'Customer not found');
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            contentPadding: EdgeInsets.zero,
+            titlePadding: EdgeInsets.zero,
+            title: _buildResponsiveHeader(context, count: ordersCount),
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isTablet ? 500 : size.width * 0.9,
+                maxHeight: isLandscape ? size.height * 0.6 : size.height * 0.8,
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Order Summary Highlight
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.shade100),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shopping_basket, color: Colors.red),
+                          const SizedBox(width: 12),
+                          const Text("Total Orders placed:", style: TextStyle(fontWeight: FontWeight.w500)),
+                          const Spacer(),
+                          Text(
+                            "$ordersCount",
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.red),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildInfoTile(Icons.person, "Name", name.toUpperCase()),
+                    _buildInfoTile(Icons.phone, "Mobile", primaryMobile),
+                    _buildInfoTile(Icons.hub, "Channel", channel),
+
+                    const Divider(height: 32),
+
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text("Delivery Address",
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700, fontSize: 12)),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Text(
+                        "${customer['address']},\n${customer['city']}, ${customer['state']} - ${customer['pincode']}",
+                        style: const TextStyle(fontSize: 14, height: 1.4, color: Colors.black87),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('USE THIS CUSTOMER'),
+              ),
+            ],
+          );
+        },
+      ).then((confirmed) {
+        if (confirmed == true) {
+          setState(() {
+            _nameController.text = name;
+            _addressController.text = customer['address'];
+            // Update order related state if needed
+          });
+        }
+      });
     }
   }
 
+// Updated Header with Badge Support
+  Widget _buildResponsiveHeader(BuildContext context, {required int count}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      decoration: BoxDecoration(
+        color: Colors.red.shade600,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.history, color: Colors.white, size: 28),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Repeat Customer',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ),
+          // Visual indicator of high-value customer
+          if (count > 50)
+            const Icon(Icons.star, color: Colors.amber, size: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoTile(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.blueGrey.shade400),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 11, letterSpacing: 0.5)),
+                Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   // void _skipToProducts() {
   //   // Create a temporary "Quick Customer" UserModel
   //   final quickCustomer = UserModel(
