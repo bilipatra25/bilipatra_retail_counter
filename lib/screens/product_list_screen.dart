@@ -54,10 +54,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
       final info = await PackageInfo.fromPlatform();
 
       final String currentVersion = info.version;
-      final String minVersion =
-          config['retail_app_minimum_version'] ?? '0.0.0';
-      final String latestVersion =
-          config['retail_app_version'] ?? '0.0.0';
+      final String minVersion = config['retail_app_minimum_version'] ?? '0.0.0';
+      final String latestVersion = config['retail_app_version'] ?? '0.0.0';
       final String apkUrl = config['retail_app_url'] ?? '';
 
       debugPrint(
@@ -66,19 +64,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
       // 🔴 Force update
       if (compareVersions(currentVersion, minVersion) < 0) {
-        _showUpdateBottomSheet(
-          forceUpdate: true,
-          apkUrl: apkUrl,
-        );
+        _showUpdateBottomSheet(forceUpdate: true, apkUrl: apkUrl);
         return;
       }
 
       // 🟡 Optional update
       if (compareVersions(currentVersion, latestVersion) < 0) {
-        _showUpdateBottomSheet(
-          forceUpdate: false,
-          apkUrl: apkUrl,
-        );
+        _showUpdateBottomSheet(forceUpdate: false, apkUrl: apkUrl);
       }
     } catch (e) {
       debugPrint("Update check failed: $e");
@@ -89,9 +81,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
     final v1Parts = v1.split('.').map(int.parse).toList();
     final v2Parts = v2.split('.').map(int.parse).toList();
 
-    final maxLength = v1Parts.length > v2Parts.length
-        ? v1Parts.length
-        : v2Parts.length;
+    final maxLength =
+        v1Parts.length > v2Parts.length ? v1Parts.length : v2Parts.length;
 
     for (int i = 0; i < maxLength; i++) {
       final v1Part = i < v1Parts.length ? v1Parts[i] : 0;
@@ -120,11 +111,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.system_update,
-                size: 60,
-                color: Colors.green.shade700,
-              ),
+              Icon(Icons.system_update, size: 60, color: Colors.green.shade700),
               const SizedBox(height: 16),
               Text(
                 "App Update Available",
@@ -176,17 +163,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
       final uri = Uri.parse(url);
 
       // First try: open in browser (MOST RELIABLE)
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.platformDefault,
-      );
+      final launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
 
       if (!launched) {
         // Fallback: external app
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
       debugPrint("Failed to open APK url: $e");
@@ -377,146 +358,148 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   message: _error!,
                   onRetry: _retryLoadProducts,
                 )
-                : GridView.builder(
-                  controller: _scrollController,
-                  itemCount: _products.length + (_hasMore ? 1 : 0),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 16, // 👈 Adds space at top and bottom
-                    horizontal: 4, // optional small side padding
-                  ),
-                  clipBehavior:
-                      Clip.none, // 👈 prevents clipping on scroll edges
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: (MediaQuery.of(context).size.width ~/ 180)
-                        .clamp(2, 5),
-                    mainAxisExtent: 250,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemBuilder: (_, index) {
-                    if (index == _products.length) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                : Container(
+                  padding: EdgeInsets.only(bottom: 60),
+                  child: GridView.builder(
+                    controller: _scrollController,
+                    itemCount: _products.length + (_hasMore ? 1 : 0),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16, // 👈 Adds space at top and bottom
+                      horizontal: 4, // optional small side padding
+                    ),
+                    clipBehavior:
+                        Clip.none, // 👈 prevents clipping on scroll edges
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: (MediaQuery.of(context).size.width ~/ 180)
+                          .clamp(2, 5),
+                      mainAxisExtent: 250,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemBuilder: (_, index) {
+                      if (index == _products.length) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                    final product = _products[index];
-                    final isSelected = selected.contains(product);
-                    final qty =
-                        isSelected
-                            ? selected
-                                .firstWhere((p) => p.id == product.id)
-                                .quantity
-                            : 0;
+                      final product = _products[index];
+                      final isSelected = selected.contains(product);
+                      final qty =
+                          isSelected
+                              ? selected
+                                  .firstWhere((p) => p.id == product.id)
+                                  .quantity
+                              : 0;
 
-                    return Card(
-                      elevation: 3,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                product.image,
-                                height: 90,
-                                width: 90,
-                                fit: BoxFit.cover,
-                                errorBuilder:
-                                    (_, __, ___) => Image.asset(
-                                      'assets/images/placeholder.jpg',
-                                      height: 90,
-                                      width: 90,
-                                      fit: BoxFit.cover,
-                                    ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              product.name,
-                              style: GoogleFonts.poppins(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            Text(
-                              product.weight,
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '₹ ${product.price.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            isSelected
-                                ? Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: Colors.green.shade50,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.remove_circle_outline,
-                                        ),
-                                        onPressed:
-                                            () => appProvider.decrementQuantity(
-                                              product,
-                                            ),
-                                      ),
-                                      Text(
-                                        '$qty',
-                                        style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.add_circle_outline,
-                                        ),
-                                        onPressed:
-                                            () => appProvider.incrementQuantity(
-                                              product,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                                : ElevatedButton(
-                                  onPressed:
-                                      () => appProvider.addProduct(product),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'Add to Cart',
-                                    style: GoogleFonts.poppins(),
-                                  ),
-                                ),
-                          ],
+                      return Card(
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                    );
-                  },
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  product.image,
+                                  height: 90,
+                                  width: 90,
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (_, __, ___) => Image.asset(
+                                        'assets/images/placeholder.jpg',
+                                        height: 90,
+                                        width: 90,
+                                        fit: BoxFit.cover,
+                                      ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                product.name,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              Text(
+                                product.weight,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '₹ ${product.price.toStringAsFixed(2)}',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              isSelected
+                                  ? Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.green.shade50,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.remove_circle_outline,
+                                          ),
+                                          onPressed:
+                                              () => appProvider
+                                                  .decrementQuantity(product),
+                                        ),
+                                        Text(
+                                          '$qty',
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.add_circle_outline,
+                                          ),
+                                          onPressed:
+                                              () => appProvider
+                                                  .incrementQuantity(product),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                  : ElevatedButton(
+                                    onPressed:
+                                        () => appProvider.addProduct(product),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Add to Cart',
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
       ),
 
