@@ -1,3 +1,4 @@
+import 'package:bilipatra_retail_counter/screens/pos/pos_dashboard_screen.dart';
 import 'package:go_router/go_router.dart';
 
 import '../screens/PaymentImageScreen.dart';
@@ -10,32 +11,37 @@ import '../screens/user_form_screen.dart';
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
   routes: [
-    GoRoute(
-      path: '/userForm',
-      name: 'userForm',
-      builder: (context, state) => const UserFormScreen(),
-    ),
+    // GoRoute(
+    //   path: '/userForm',
+    //   name: 'userForm',
+    //   builder: (context, state) => const UserFormScreen(),
+    // ),
+    // GoRoute(
+    //   path: '/',
+    //   name: 'productList',
+    //   builder: (context, state) => const ProductListScreen(),
+    // ),
     GoRoute(
       path: '/',
       name: 'productList',
-      builder: (context, state) => const ProductListScreen(),
+      builder: (context, state) => const PosDashboardScreen(),
     ),
-    GoRoute(
-      path: '/confirm',
-      name: 'confirmOrder',
-      builder: (context, state) => const ConfirmOrderScreen(),
-    ),
-    GoRoute(
-      name: 'paymentImage',
-      path: '/payment',
-      builder: (context, state) {
-        final data = state.extra! as Map<String, dynamic>;
-        return PaymentImageScreen(
-          orderId: data['orderId'],
-          imageUrl: data['imageUrl'],
-        );
-      },
-    ),
+    // GoRoute(
+    //   path: '/confirm',
+    //   name: 'confirmOrder',
+    //   builder: (context, state) => const ConfirmOrderScreen(),
+    // ),
+    // GoRoute(
+    //   name: 'paymentImage',
+    //   path: '/payment',
+    //   builder: (context, state) {
+    //     final data = state.extra! as Map<String, dynamic>;
+    //     return PaymentImageScreen(
+    //       orderId: data['orderId'],
+    //       imageUrl: data['imageUrl'],
+    //     );
+    //   },
+    // ),
     GoRoute(
       path: '/order-success/:orderId',
       name: 'orderSuccess',

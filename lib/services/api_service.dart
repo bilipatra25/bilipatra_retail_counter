@@ -19,7 +19,8 @@ class ApiService {
   // static const String baseUrl = 'http://13.233.150.163:8084/storelocate';
   // static const String baseUrl = 'http://172.20.10.4:8084/storelocate';
   // static const String baseUrl = 'http://192.168.31.150:8084/storelocate'; //Local
-  static const String baseUrl = 'https://store-locater.bilipatra.com/storelocate'; //Live
+  static const String baseUrl =
+      'https://store-locater.bilipatra.com/storelocate'; //Live
   // static const String baseUrl = 'http://3.108.43.136:8084/storelocate'; //Dev
   ApiService(this.context);
 
@@ -347,10 +348,9 @@ class ApiService {
   ///Example Ends ------
 
   Future<Map<String, dynamic>> userSelectByMobileNo(String mobile) async {
-    return await _postRequest(
-      "retailcounter_customer/v1/get-user-orders",
-      {'mobile_no': int.parse(mobile)},
-    );
+    return await _postRequest("retailcounter_customer/v1/get-user-orders", {
+      'mobile_no': int.parse(mobile),
+    });
   }
 
   Future<Map<String, dynamic>> customerLogin(
@@ -457,21 +457,21 @@ class ApiService {
     required String mobileNo,
     required String address,
   }) async {
-    return await _postRequest("retailcounter_customer/v1/sendwholesaleinquiry", {
-      "customer_name": customerName,
-      "mobile_no": mobileNo,
-      "address": address,
-    });
+    return await _postRequest(
+      "retailcounter_customer/v1/sendwholesaleinquiry",
+      {
+        "customer_name": customerName,
+        "mobile_no": mobileNo,
+        "address": address,
+      },
+    );
   }
 
   Future<Map<String, String>> fetchAppConfig() async {
-    final response = await _postRequest(
-      '/configuration/v1/apiselectall',
-      {
-        "pageIndex": 1,
-        "pageSize": 20,
-      },
-    );
+    final response = await _postRequest('/configuration/v1/apiselectall', {
+      "pageIndex": 1,
+      "pageSize": 20,
+    });
 
     final List list = response['data']['result'];
 
@@ -483,6 +483,21 @@ class ApiService {
     }
 
     return config;
+  }
+
+  Future<bool> sendQrWhatsApp(Map<String, dynamic> data) async {
+    // Note: Update this endpoint string if your Node.js route is named differently
+    final response = await _postRequest(
+      'retailcounter_order/v1/send_qr_whatsapp',
+      data,
+    );
+    return response['flag'] == 1 && response['code'] == 200;
+  }
+
+  Future<Map<String, dynamic>> cancelOrder(int orderId) async {
+    return await _postRequest("retailcounter_order/v1/delete", {
+      'order_id': orderId,
+    });
   }
 }
 
