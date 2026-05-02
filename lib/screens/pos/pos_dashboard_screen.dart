@@ -11,12 +11,19 @@ class PosDashboardScreen extends StatelessWidget {
   const PosDashboardScreen({super.key});
 
   // 🟢 Helper function to launch the WebView
-  // 🟢 Helper function to launch the Admin panel securely
   void _openAdminDashboard(BuildContext context) {
+    const String adminMobile = "9974882009";
+    const String adminPassword = "vraj@123";
+    // Point this one to the main dashboard / orderList
+    final String targetUrl = 'https://retail-counter.bilipatra.com/login?username=$adminMobile&password=$adminPassword&redirect=/admin/orderList';
+
     showDialog(
       context: context,
-      barrierDismissible: false, // Force them to click the big red close button
-      builder: (context) => const AdminDashboardModal(),
+      barrierDismissible: false,
+      builder: (context) => AdminDashboardModal(
+        url: targetUrl,
+        title: "Admin Dashboard", // Title for the main dashboard
+      ),
     );
   }
 

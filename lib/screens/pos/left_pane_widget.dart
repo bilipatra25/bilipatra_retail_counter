@@ -1,3 +1,4 @@
+import 'package:bilipatra_retail_counter/screens/pos/admin_dashboard_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -220,6 +221,21 @@ class _LeftPaneWidgetState extends State<LeftPaneWidget> {
     );
   }
 
+  void _openManageProducts(BuildContext context) {
+    final String targetUrl =
+        'https://retail-counter.bilipatra.com/admin/products';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => AdminDashboardModal(
+            url: targetUrl,
+            title: "Product Management", // Custom title
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appProvider = Provider.of<AppProvider>(context);
@@ -258,20 +274,9 @@ class _LeftPaneWidgetState extends State<LeftPaneWidget> {
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.add),
-                  label: const Text("Add Product"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                  onPressed: () => _openManageProducts(context),
+                  icon: const Icon(Icons.edit_note),
+                  label: const Text("Manage Products"),
                 ),
               ],
             ),
