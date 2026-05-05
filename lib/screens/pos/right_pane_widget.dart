@@ -663,7 +663,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                           vertical: 4,
                         ),
                         title: Text(
-                          item.product.name,
+                          "${item.product.name} (${item.product.weight})",
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Column(
