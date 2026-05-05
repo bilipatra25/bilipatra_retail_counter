@@ -507,6 +507,15 @@ class ApiService {
       'order_id': orderId,
     });
   }
+
+  // 🟢 NEW: Fetch Dashboard Report Data
+  Future<Map<String, dynamic>> getDashboardReport(String startDate, String endDate) async {
+    final response = await _postRequest('retailcounter_order/v1/TotalOrderReport', {
+      "start_date": startDate,
+      "end_date": endDate,
+    });
+    return response;
+  }
 }
 
 // Custom API Exception
