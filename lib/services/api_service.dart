@@ -428,14 +428,22 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> data) async {
-    final response = await _postRequest(
-      'retailcounter_order/v1/apiinsert',
-      data,
-    );
+    final response = await _postRequest('retailcounter_order/v1/apiinsert', data);
     if (response['flag'] == 1 && response['code'] == 200) {
-      return response['data'];
+      return response['data'] ?? {}; // 🟢 Added fallback for empty data objects
     } else {
       throw Exception('Order failed: ${response['message']}');
+    }
+  }
+
+  // 🟢 NEW: The Update Route
+  Future<Map<String, dynamic>> updateOrder(Map<String, dynamic> data) async {
+    // Note: Double check if your backend uses 'apiupdate' or 'update' for this endpoint!
+    final response = await _postRequest('retailcounter_order/v1/apiupdate', data);
+    if (response['flag'] == 1 && response['code'] == 200) {
+      return response['data'] ?? {};
+    } else {
+      throw Exception('Order update failed: ${response['message']}');
     }
   }
 

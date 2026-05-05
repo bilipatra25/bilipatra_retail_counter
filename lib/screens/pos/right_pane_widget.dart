@@ -190,12 +190,14 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    // ... (inside _showCustomerDialog) ...
                     TextField(
                       controller: nameController,
-                      autofocus: !isExisting, // Only autofocus if new
+                      autofocus: !isExisting,
                       textCapitalization: TextCapitalization.words,
                       decoration: const InputDecoration(
-                        labelText: "Customer Name *",
+                        labelText:
+                            "Customer Name (Optional)", // 🟢 Removed the *
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.person),
                       ),
@@ -206,7 +208,8 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       textCapitalization: TextCapitalization.sentences,
                       maxLines: 2,
                       decoration: const InputDecoration(
-                        labelText: "Address / Area",
+                        labelText:
+                            "Address / Area (Optional)", // 🟢 Made explicit
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.location_on),
                       ),
@@ -244,30 +247,29 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       isSaving
                           ? null
                           : () async {
-                            if (nameController.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("⚠️ Customer Name is required"),
-                                  backgroundColor: Colors.orange,
-                                ),
-                              );
-                              return;
-                            }
+                            // 🔴 REMOVED the strict isEmpty validation block here!
 
                             setDialogState(() => isSaving = true);
+
+                            // 🟢 NEW: Add a fallback name if the cashier leaves it blank
+                            String finalName = nameController.text.trim();
+                            if (finalName.isEmpty) {
+                              finalName = "Walk-in Customer";
+                            }
+
+                            String finalAddress = addressController.text.trim();
 
                             try {
                               final response = await ApiService(
                                 context,
                               ).customerLogin(
-                                nameController.text.trim(),
+                                finalName, // 🟢 Use the fallback variable
                                 mobile,
-                                addressController.text.trim(),
+                                finalAddress,
                               );
 
                               if (response['flag'] == 1 ||
                                   response['code'] == 200) {
-                                // 🟢 BULLETPROOF ID EXTRACTION
                                 int finalCustomerId = provider.defaultWalkInId;
 
                                 // 1. First, check if the insert API returned the new ID
@@ -279,8 +281,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                         response['data']['id'] ??
                                         finalCustomerId;
                                   } else if (response['data'] is int) {
-                                    finalCustomerId =
-                                        response['data']; // If backend returns just the number
+                                    finalCustomerId = response['data'];
                                   } else if (response['data'] is String) {
                                     finalCustomerId =
                                         int.tryParse(response['data']) ??
@@ -288,7 +289,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                   }
                                 }
 
-                                // 2. If it's an existing customer and the update API didn't return an ID, pull it from their original fetched data
+                                // 2. If existing customer and no ID returned, pull from original data
                                 if (isExisting &&
                                     finalCustomerId ==
                                         provider.defaultWalkInId &&
@@ -299,21 +300,14 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       provider.defaultWalkInId;
                                 }
 
-                                // 3. Debug warning if we STILL couldn't find an ID
-                                if (finalCustomerId ==
-                                    provider.defaultWalkInId) {
-                                  debugPrint(
-                                    "⚠️ WARNING: Could not find customer ID from backend. Defaulting to 1.",
-                                  );
-                                }
-
-                                // Assign to cart
+                                // Assign to cart using the safe fallback variables
                                 provider.setCustomer(
                                   UserModel(
                                     id: finalCustomerId,
-                                    name: nameController.text.trim(),
+                                    name:
+                                        finalName, // 🟢 Use the fallback variable
                                     number: mobile,
-                                    address: addressController.text.trim(),
+                                    address: finalAddress,
                                   ),
                                 );
 
@@ -547,9 +541,84 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
 
     return Column(
       children: [
-        // 1. CUSTOMER HEADER
+        // ==========================================
+        // 🟢 COMPACT EDITING BANNER
+        // ==========================================
+        if (appProvider.isEditingOrder)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 6,
+            ), // 📉 Tighter padding
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              border: Border(
+                bottom: BorderSide(color: Colors.orange.shade300, width: 2),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.edit_note,
+                      color: Colors.orange.shade900,
+                      size: 22,
+                    ), // 📉 Smaller icon
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "EDITING ORDER #${appProvider.editingOrderId}",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade900,
+                            fontSize: 13,
+                          ), // 📉 Smaller font
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  height: 30, // 📉 Force button to be tiny
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      appProvider.clearCartAndCustomer();
+                      _mobileController.clear();
+                    },
+                    icon: const Icon(Icons.close, size: 14),
+                    label: const Text(
+                      "Cancel",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.red.shade700,
+                      elevation: 0,
+                      side: BorderSide(color: Colors.red.shade200),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 0,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // ==========================================
+        // 🟢 COMPACT CUSTOMER HEADER
+        // ==========================================
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(10), // 📉 Tighter padding
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -565,17 +634,23 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 ],
                 onChanged: (val) => _fetchCustomer(val, appProvider),
                 decoration: InputDecoration(
+                  isDense: true, // 📉 CRITICAL: Makes the text field shorter!
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ), // 📉 Smaller internal padding
                   labelText: "Customer Mobile (Optional)",
-                  prefixIcon: const Icon(Icons.phone),
+                  prefixIcon: const Icon(Icons.phone, size: 20),
                   suffixIcon:
                       _isLoadingCustomer
                           ? const Padding(
-                            padding: EdgeInsets.all(12),
+                            padding: EdgeInsets.all(8),
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                           : _mobileController.text.isNotEmpty
                           ? IconButton(
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(Icons.clear, size: 18),
+                            splashRadius: 20,
                             onPressed: () {
                               _mobileController.clear();
                               appProvider.clearCustomer();
@@ -588,14 +663,14 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 ),
               ),
 
-              // Verification Badge UI
+              // Verification Badge UI (Also made more compact)
               if (user != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 8),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                      horizontal: 8,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,
@@ -607,7 +682,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                         const Icon(
                           Icons.verified_user,
                           color: Colors.green,
-                          size: 20,
+                          size: 16,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -616,15 +691,11 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.green,
+                              fontSize: 13,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          "Active Customer",
-                          style: TextStyle(fontSize: 12, color: Colors.black54),
                         ),
                       ],
                     ),
@@ -634,7 +705,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
           ),
         ),
 
+        // ==========================================
         // 2. ACTIVE CART LIST
+        // ==========================================
         Expanded(
           child:
               appProvider.cart.isEmpty
@@ -643,7 +716,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       "Cart is empty",
                       style: TextStyle(
                         color: Colors.grey.shade500,
-                        fontSize: 18,
+                        fontSize: 16,
                       ),
                     ),
                   )
@@ -657,20 +730,53 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       );
                       final rowFinalTotal = appProvider.getItemFinalTotal(item);
 
+                      String discountDetails = "";
+                      if (item.hasCustomDiscount) {
+                        final valStr = item.discountValue.toStringAsFixed(
+                          item.discountValue.truncateToDouble() ==
+                                  item.discountValue
+                              ? 0
+                              : 1,
+                        );
+                        discountDetails =
+                            item.discountType == DiscountType.percent
+                                ? "($valStr% Override)"
+                                : "(₹$valStr Override)";
+                      } else if (appProvider.globalDiscountValue > 0) {
+                        final valStr = appProvider.globalDiscountValue
+                            .toStringAsFixed(
+                              appProvider.globalDiscountValue
+                                          .truncateToDouble() ==
+                                      appProvider.globalDiscountValue
+                                  ? 0
+                                  : 1,
+                            );
+                        discountDetails =
+                            appProvider.globalDiscountType ==
+                                    DiscountType.percent
+                                ? "($valStr% Global)"
+                                : "(₹$valStr Global)";
+                      }
+
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
-                        ),
+                          horizontal: 12,
+                          vertical: 0,
+                        ), // 📉 Tighter padding
+                        visualDensity: VisualDensity.compact,
                         title: Text(
                           "${item.product.name} (${item.product.weight})",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               "₹${item.product.price.toStringAsFixed(0)} x ${item.quantity}",
+                              style: const TextStyle(fontSize: 12),
                             ),
                             if (rowDiscount > 0)
                               InkWell(
@@ -680,13 +786,14 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       specificItem: item,
                                     ),
                                 child: Text(
-                                  "Discount: -₹${rowDiscount.toStringAsFixed(0)} ${item.hasCustomDiscount ? '(Override)' : ''}",
+                                  "Discount: -₹${rowDiscount.toStringAsFixed(0)} $discountDetails",
                                   style: TextStyle(
                                     color:
                                         item.hasCustomDiscount
                                             ? Colors.orange.shade700
                                             : Colors.red,
                                     fontWeight: FontWeight.w500,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),
@@ -699,10 +806,10 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                               "₹${rowFinalTotal.toStringAsFixed(0)}",
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: 15,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 4),
                             IconButton(
                               icon: Icon(
                                 Icons.local_offer_outlined,
@@ -710,8 +817,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                     item.hasCustomDiscount
                                         ? Colors.orange
                                         : Colors.blue,
+                                size: 20,
                               ),
-                              tooltip: "Item Override Discount",
+                              splashRadius: 20,
                               onPressed:
                                   () => _showDiscountDialog(
                                     provider: appProvider,
@@ -722,7 +830,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                               icon: const Icon(
                                 Icons.delete_outline,
                                 color: Colors.red,
+                                size: 20,
                               ),
+                              splashRadius: 20,
                               onPressed:
                                   () =>
                                       appProvider.removeCartItem(item.product),
@@ -734,10 +844,15 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   ),
         ),
 
-        // 3. CHECKOUT FOOTER
+        // ==========================================
+        // 🟢 COMPACT CHECKOUT FOOTER
+        // ==========================================
         if (appProvider.cart.isNotEmpty)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 10,
+            ), // 📉 Tighter vertical padding
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
@@ -750,96 +865,172 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
             ),
             child: Column(
               children: [
+                // Combine Global Discount Button with Gross Total to save a whole line of height!
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      "Gross Total:",
-                      style: TextStyle(fontSize: 16, color: Colors.black54),
+                    InkWell(
+                      onTap:
+                          () => _showDiscountDialog(
+                            provider: appProvider,
+                            specificItem: null,
+                          ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.style,
+                            color:
+                                appProvider.globalDiscountValue > 0
+                                    ? Colors.green
+                                    : Colors.blueGrey,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            appProvider.globalDiscountValue > 0
+                                ? "Global Discount Active"
+                                : "Add Global Discount",
+                            style: TextStyle(
+                              color:
+                                  appProvider.globalDiscountValue > 0
+                                      ? Colors.green
+                                      : Colors.blueGrey,
+                              fontSize: 13,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     Text(
-                      "₹${appProvider.cartSubtotal.toStringAsFixed(2)}",
-                      style: const TextStyle(fontSize: 16),
+                      "Gross: ₹${appProvider.cartSubtotal.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
+                      ),
                     ),
                   ],
                 ),
+
+                const SizedBox(height: 4), // 📉 Tiny gap
 
                 if (appProvider.cartTotalDiscount > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Total Discounts:",
-                          style: TextStyle(fontSize: 16, color: Colors.red),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        "Discounts: -₹${appProvider.cartTotalDiscount.toStringAsFixed(0)}",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
                         ),
-                        Text(
-                          "-₹${appProvider.cartTotalDiscount.toStringAsFixed(2)}",
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
 
-                const Divider(height: 16),
-
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed:
-                        () => _showDiscountDialog(
-                          provider: appProvider,
-                          specificItem: null,
+                const Divider(height: 12), // 📉 Tighter divider
+                // 🟢 DYNAMIC LEDGER UI (Condensed)
+                if (appProvider.isEditingOrder &&
+                    appProvider.previouslyPaidAmount > 0) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "New Total:",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
-                    icon: Icon(
-                      Icons.style,
-                      color:
-                          appProvider.globalDiscountValue > 0
-                              ? Colors.green
-                              : Colors.blueGrey,
-                      size: 18,
-                    ),
-                    label: Text(
-                      appProvider.globalDiscountValue > 0
-                          ? "Global Discount Active (Tap to edit)"
-                          : "Apply Global Cart Discount",
-                      style: TextStyle(
-                        color:
-                            appProvider.globalDiscountValue > 0
-                                ? Colors.green
-                                : Colors.blueGrey,
                       ),
-                    ),
+                      Text(
+                        "₹${appProvider.cartFinalTotal.toStringAsFixed(0)}",
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Grand Total:",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Previously Paid:",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
                       ),
-                    ),
-                    Text(
-                      "₹${appProvider.cartFinalTotal.toStringAsFixed(0)}",
-                      style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
+                      Text(
+                        "-₹${appProvider.previouslyPaidAmount.toStringAsFixed(0)}",
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        appProvider.balanceDue >= 0
+                            ? "Balance Due:"
+                            : "Refund Due:",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color:
+                              appProvider.balanceDue >= 0
+                                  ? Colors.orange.shade800
+                                  : Colors.red.shade800,
+                        ),
+                      ),
+                      Text(
+                        "₹${appProvider.balanceDue.abs().toStringAsFixed(0)}",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color:
+                              appProvider.balanceDue >= 0
+                                  ? Colors.orange.shade800
+                                  : Colors.red.shade800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  // 🟢 STANDARD WALK-IN UI
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Grand Total:",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "₹${appProvider.cartFinalTotal.toStringAsFixed(0)}",
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
 
+                const SizedBox(height: 10), // 📉 Tighter gap before buttons
+                // 🟢 SQUASHED CHECKOUT BUTTONS
                 Row(
                   children: [
                     Expanded(
@@ -856,9 +1047,45 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                           context,
                                           appProvider,
                                         );
+
+                                    if (responseData.containsKey(
+                                      'action_required',
+                                    )) {
+                                      final action =
+                                          responseData['action_required'];
+                                      final delta =
+                                          double.tryParse(
+                                            responseData['delta_amount']
+                                                    ?.toString() ??
+                                                '0',
+                                          ) ??
+                                          0.0;
+
+                                      if (action == 'refund') {
+                                        _showRefundAlert(context, delta.abs());
+                                      } else if (action == 'collect') {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                "⚠️ Order Updated. Please collect extra ₹${delta.toStringAsFixed(2)} in CASH.",
+                                              ),
+                                              backgroundColor:
+                                                  Colors.orange.shade800,
+                                              duration: const Duration(
+                                                seconds: 6,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    }
+
                                     appProvider.clearCartAndCustomer();
                                     _mobileController.clear();
-                                    if (mounted)
+                                    if (mounted) {
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
@@ -869,6 +1096,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                           backgroundColor: Colors.green,
                                         ),
                                       );
+                                    }
                                   } catch (e) {
                                     if (mounted)
                                       ScaffoldMessenger.of(
@@ -891,32 +1119,39 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                         icon:
                             _isProcessingCheckout
                                 ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
+                                  width: 16,
+                                  height: 16,
                                   child: CircularProgressIndicator(
                                     color: Colors.white,
                                     strokeWidth: 2,
                                   ),
                                 )
-                                : const Icon(Icons.payments),
+                                : const Icon(Icons.payments, size: 20),
                         label: Text(
-                          _isProcessingCheckout ? "PROCESSING..." : "PAY CASH",
+                          _isProcessingCheckout
+                              ? "WAIT..."
+                              : (appProvider.isEditingOrder
+                                  ? "UPDATE (CASH)"
+                                  : "PAY CASH"),
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                          ), // 📉 CRITICAL: Shrinks button height!
                           backgroundColor: Colors.green.shade700,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
+
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed:
@@ -932,52 +1167,95 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                           appProvider,
                                         );
                                     final orderId = responseData['order_id'];
-                                    final grandTotal =
-                                        double.tryParse(
-                                          responseData['grand_total']
-                                              .toString(),
-                                        ) ??
-                                        0.0;
-                                    final qrImageUrl =
-                                        responseData['image_url'];
                                     final currentMobile =
                                         _mobileController.text;
+
+                                    bool showQrDialog = true;
+                                    double amountToAsk =
+                                        double.tryParse(
+                                          responseData['grand_total']
+                                                  ?.toString() ??
+                                              '0',
+                                        ) ??
+                                        0.0;
+
+                                    if (responseData.containsKey(
+                                      'action_required',
+                                    )) {
+                                      final action =
+                                          responseData['action_required'];
+                                      final delta =
+                                          double.tryParse(
+                                            responseData['delta_amount']
+                                                    ?.toString() ??
+                                                '0',
+                                          ) ??
+                                          0.0;
+
+                                      if (action == 'refund') {
+                                        showQrDialog = false;
+                                        _showRefundAlert(context, delta.abs());
+                                      } else if (action == 'none') {
+                                        showQrDialog = false;
+                                      } else if (action == 'collect') {
+                                        amountToAsk = delta;
+                                      }
+                                    }
 
                                     if (mounted)
                                       setState(
                                         () => _isProcessingCheckout = false,
                                       );
 
-                                    if (mounted) {
-                                      final isPaid = await showDialog<bool>(
-                                        context: context,
-                                        barrierDismissible: false,
-                                        builder:
-                                            (context) => QRPaymentDialog(
-                                              orderId: orderId,
-                                              amount: grandTotal,
-                                              qrImageUrl: qrImageUrl,
-                                              initialMobile:
-                                                  currentMobile.isNotEmpty
-                                                      ? currentMobile
-                                                      : null,
-                                            ),
-                                      );
-
-                                      if (isPaid == true) {
-                                        appProvider.clearCartAndCustomer();
-                                        _mobileController.clear();
-                                        if (mounted)
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                "✅ Online Order Completed!",
+                                    if (showQrDialog) {
+                                      final qrImageUrl =
+                                          responseData['image_url'];
+                                      if (mounted) {
+                                        final isPaid = await showDialog<bool>(
+                                          context: context,
+                                          barrierDismissible: false,
+                                          builder:
+                                              (context) => QRPaymentDialog(
+                                                orderId: orderId,
+                                                amount: amountToAsk,
+                                                qrImageUrl: qrImageUrl,
+                                                initialMobile:
+                                                    currentMobile.isNotEmpty
+                                                        ? currentMobile
+                                                        : null,
                                               ),
-                                              backgroundColor: Colors.green,
+                                        );
+
+                                        if (isPaid == true) {
+                                          appProvider.clearCartAndCustomer();
+                                          _mobileController.clear();
+                                          if (mounted)
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  "✅ Online Order Completed!",
+                                                ),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+                                        }
+                                      }
+                                    } else {
+                                      appProvider.clearCartAndCustomer();
+                                      _mobileController.clear();
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              "✅ Order Updated Successfully!",
                                             ),
-                                          );
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
                                       }
                                     }
                                   } catch (e) {
@@ -999,27 +1277,33 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                         icon:
                             _isProcessingCheckout
                                 ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
+                                  width: 16,
+                                  height: 16,
                                   child: CircularProgressIndicator(
                                     color: Colors.white,
                                     strokeWidth: 2,
                                   ),
                                 )
-                                : const Icon(Icons.qr_code_2),
+                                : const Icon(Icons.qr_code_2, size: 20),
                         label: Text(
-                          _isProcessingCheckout ? "PROCESSING..." : "UPI QR",
+                          _isProcessingCheckout
+                              ? "WAIT..."
+                              : (appProvider.isEditingOrder
+                                  ? "UPDATE (UPI)"
+                                  : "UPI QR"),
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                          ), // 📉 CRITICAL: Shrinks button height!
                           backgroundColor: Colors.blueAccent.shade700,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
                       ),
@@ -1030,6 +1314,41 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
             ),
           ),
       ],
+    );
+  }
+
+  void _showRefundAlert(BuildContext context, double amount) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => AlertDialog(
+            icon: const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange,
+              size: 48,
+            ),
+            title: const Text("Refund Required"),
+            content: Text(
+              "This updated order is cheaper than the original.\n\nPlease refund ₹${amount.toStringAsFixed(2)} to the customer.",
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade700,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  "I have refunded the amount",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
     );
   }
 }

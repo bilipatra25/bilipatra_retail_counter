@@ -6,9 +6,15 @@ import '../models/product.dart';
 class AppProvider with ChangeNotifier {
   // --- Customer State ---
   UserModel? _selectedCustomer;
-  final int defaultWalkInId = 0;
+  final int defaultWalkInId = 1; //Testing
+  // final int defaultWalkInId = 0; // Walk In User
   UserModel? get selectedCustomer => _selectedCustomer;
   int get activeCustomerId => _selectedCustomer?.id ?? defaultWalkInId;
+
+  int? _editingOrderId;
+
+  int? get editingOrderId => _editingOrderId;
+  bool get isEditingOrder => _editingOrderId != null;
 
   void setCustomer(UserModel user) {
     _selectedCustomer = user;
@@ -119,23 +125,40 @@ class AppProvider with ChangeNotifier {
   // --- Dynamic Math Calculations ---
 
   // Gets the exact discount for a specific item, respecting overrides
+  // 🟢 UPDATED: Calculates the exact discount by stacking Item & Global discounts!
+  // 🟢 UPDATED: Isolated Discount Logic
   double getItemCalculatedDiscount(CartItem item) {
+    double baseAmount = item.discountBase == DiscountBase.mrp ? item.totalMrp : item.totalSellingPrice;
+
+    // 1. ISOLATED OVERRIDE: If the item has a custom discount, it ONLY gets this.
     if (item.hasCustomDiscount) {
       return item.calculateDiscountAmount(
         item.discountType,
         item.discountValue,
         item.discountBase,
       );
-    } else {
-      // If it's a global FLAT discount, we divide it proportionally across non-overridden items
-      // For simplicity here, we assume Flat Cart discounts are distributed equally, or we use percent.
-      // Usually, Global is a percentage.
-      return item.calculateDiscountAmount(
-        _globalDiscountType,
-        _globalDiscountValue,
-        _globalDiscountBase,
-      );
     }
+
+    // 2. GLOBAL ONLY: If no override, apply the global cart discount.
+    if (_globalDiscountValue > 0) {
+      if (_globalDiscountType == DiscountType.percent) {
+        return (baseAmount * _globalDiscountValue) / 100;
+      } else if (_globalDiscountType == DiscountType.flat) {
+
+        // Find the total value of ONLY the items that are eligible for the global discount
+        double cartEligibleTotal = _cart.fold(0.0, (sum, cartItem) {
+          if (cartItem.hasCustomDiscount) return sum; // Skip overridden items!
+          return sum + (cartItem.discountBase == DiscountBase.mrp ? cartItem.totalMrp : cartItem.totalSellingPrice);
+        });
+
+        // Distribute the flat global discount proportionally
+        if (cartEligibleTotal > 0) {
+          return _globalDiscountValue * (baseAmount / cartEligibleTotal);
+        }
+      }
+    }
+
+    return 0.0; // No discount applies
   }
 
   double getItemFinalTotal(CartItem item) {
@@ -153,11 +176,42 @@ class AppProvider with ChangeNotifier {
 
   int get totalItems => _cart.fold(0, (sum, item) => sum + item.quantity);
 
+  // 🟢 NEW: Track how much was paid on the previous bill
+  double _previouslyPaidAmount = 0.0;
+
+  double get previouslyPaidAmount => _previouslyPaidAmount;
+  // If positive, customer owes us. If negative, we owe customer a refund.
+  double get balanceDue => cartFinalTotal - _previouslyPaidAmount;
+
+
+  // 🟢 UPDATED: Now accepts the previouslyPaid parameter
+  void loadExistingOrder(
+      int orderId,
+      UserModel customer,
+      List<CartItem> previousItems,
+      {DiscountType globalDiscountType = DiscountType.none, double globalDiscountValue = 0.0, double previouslyPaid = 0.0}
+      ) {
+    _cart.clear();
+    _globalDiscountType = globalDiscountType;
+    _globalDiscountValue = globalDiscountValue;
+    _editingOrderId = orderId;
+    _selectedCustomer = customer;
+
+    // 🟢 Save the paid amount to state!
+    _previouslyPaidAmount = previouslyPaid;
+
+    _cart.addAll(previousItems);
+    notifyListeners();
+  }
+
+  // 🟢 UPDATED: Make sure to reset the paid amount when closing the cart
   void clearCartAndCustomer() {
     _cart.clear();
     _selectedCustomer = null;
     _globalDiscountType = DiscountType.none;
     _globalDiscountValue = 0.0;
+    _editingOrderId = null;
+    _previouslyPaidAmount = 0.0; // Reset
     notifyListeners();
   }
 }
