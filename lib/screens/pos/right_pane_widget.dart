@@ -1,3 +1,5 @@
+import 'package:bilipatra_retail_counter/models/order_model.dart';
+import 'package:bilipatra_retail_counter/utils/PrinterHelper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -1079,6 +1081,17 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
 
                                     appProvider.clearCartAndCustomer();
                                     _mobileController.clear();
+
+                                    // 🟢 AUTO PRINT CASH ORDER
+                                    final orderIdToPrint =
+                                        responseData['order_id'] ??
+                                        appProvider.editingOrderId;
+                                    if (orderIdToPrint != null) {
+                                      _fetchAndPrintOrder(
+                                        int.parse(orderIdToPrint.toString()),
+                                      );
+                                    }
+
                                     if (mounted) {
                                       ScaffoldMessenger.of(
                                         context,
@@ -1237,6 +1250,19 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                         if (isPaid == true) {
                                           appProvider.clearCartAndCustomer();
                                           _mobileController.clear();
+
+                                          // 🟢 AUTO PRINT ONLINE ORDER
+                                          final orderIdToPrint =
+                                              responseData['order_id'] ??
+                                              appProvider.editingOrderId;
+                                          if (orderIdToPrint != null) {
+                                            _fetchAndPrintOrder(
+                                              int.parse(
+                                                orderIdToPrint.toString(),
+                                              ),
+                                            );
+                                          }
+
                                           if (mounted) {
                                             ScaffoldMessenger.of(
                                               context,
@@ -1357,5 +1383,37 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
             ],
           ),
     );
+  }
+
+  // 🟢 NEW: Auto-Fetch & Print Function
+  Future<void> _fetchAndPrintOrder(int orderId) async {
+    try {
+      final res = await ApiService(context).orderListById(orderId.toString());
+      if (res['flag'] == 1 && res['data'] != null) {
+        OrderModelResponse order = OrderModelResponse.fromJson(res['data']);
+        order.orderId = orderId.toString();
+
+        // Attempt to print
+        await PrinterHelper.printInvoice(order);
+      }
+    } catch (e) {
+      debugPrint("Auto-print failed: $e");
+
+      // 🟢 Alert the cashier that the order succeeded, but the printer is not connected
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("⚠️ Order successful, but print failed: No Default Printer Configured."),
+            backgroundColor: Colors.orange.shade900,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'DISMISS',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    }
   }
 }

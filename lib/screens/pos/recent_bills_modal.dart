@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // 🟢 Required for state injection
+import 'package:provider/provider.dart';
 
 import '../../services/api_service.dart';
 import '../../providers/app_provider.dart';
 import '../../models/cart_item_model.dart';
 import '../../models/user.dart';
 import '../../models/product.dart';
+import '../../models/order_model.dart'; // 🟢 Added for printing
+import '../../utils/PrinterHelper.dart'; // 🟢 Added for printing
 
 class RecentBillsModal extends StatefulWidget {
   const RecentBillsModal({super.key});
@@ -78,8 +80,46 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
     }
   }
 
-  // 🟢 NEW: The powerful Edit Order function
-  // 🟢 UPDATED: The powerful Edit Order function (Now with Discounts!)
+  // 🟢 NEW: Print Order Function
+  Future<void> _printOrder(int orderId) async {
+    // ScaffoldMessenger.of(context).showSnackBar(
+    //   SnackBar(
+    //     content: Text("Fetching receipt #$orderId for printing..."),
+    //     duration: const Duration(seconds: 1),
+    //   ),
+    // );
+
+    try {
+      final res = await ApiService(context).orderListById(orderId.toString());
+      if (res['flag'] == 1 && res['data'] != null) {
+        OrderModelResponse order = OrderModelResponse.fromJson(res['data']);
+        order.orderId = orderId.toString();
+
+        await PrinterHelper.printInvoice(order);
+      } else {
+        throw Exception("Failed to load order details for printing");
+      }
+    } catch (e) {
+      debugPrint("Print failed: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              "⚠️ Print failed: No Default Printer Configured.",
+            ),
+            backgroundColor: Colors.orange.shade900,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'DISMISS',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _editOrder(int orderId) async {
     showDialog(
       context: context,
@@ -107,7 +147,7 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
           address: customerData['address'] ?? '',
         );
 
-        // 2. 🟢 Extract Global Discount from the Invoice object
+        // 2. Extract Global Discount from the Invoice object
         final invoiceData = data['invoice'] ?? {};
         final double previousGlobalDiscount =
             double.tryParse(
@@ -138,7 +178,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                 DateTime.now().add(const Duration(days: 365)),
           );
 
-          // 🟢 CRITICAL FIX: Read the true percentage field, not the absolute amount
           final double itemDiscountPercent =
               double.tryParse(p['item_discount_percent']?.toString() ?? '0') ??
               0.0;
@@ -148,7 +187,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
             quantity: p['qty'] ?? 1,
           );
 
-          // 🟢 Only apply an override if the item actually had its own specific percentage saved
           if (itemDiscountPercent > 0) {
             newItem.hasCustomDiscount = true;
             newItem.discountType = DiscountType.percent;
@@ -159,11 +197,10 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
           cartItems.add(newItem);
         }
 
-        // ... (inside _editOrder, right after the productList loop finishes) ...
-
-        // 🟢 NEW: Extract the previously paid amount from the summary
         final summaryData = data['summary'] ?? {};
-        final double previouslyPaid = double.tryParse(summaryData['paid_amount']?.toString() ?? '0') ?? 0.0;
+        final double previouslyPaid =
+            double.tryParse(summaryData['paid_amount']?.toString() ?? '0') ??
+            0.0;
 
         // 4. Inject into Provider!
         if (mounted) {
@@ -171,15 +208,16 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
             orderId,
             customer,
             cartItems,
-            globalDiscountType: previousGlobalDiscount > 0 ? DiscountType.percent : DiscountType.none,
+            globalDiscountType:
+                previousGlobalDiscount > 0
+                    ? DiscountType.percent
+                    : DiscountType.none,
             globalDiscountValue: previousGlobalDiscount,
-            previouslyPaid: previouslyPaid, // 🟢 Inject into the provider!
+            previouslyPaid: previouslyPaid,
           );
 
           Navigator.pop(context); // Close loading dialog
           Navigator.pop(context); // Close Recent Bills Modal
-
-          // ... rest of your code ...
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -365,9 +403,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                           style: TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                       )
-                      // ==========================================
-                      // 🟢 UPDATED: LIST VIEW BUILDER
-                      // ==========================================
                       : ListView.builder(
                         padding: const EdgeInsets.all(16),
                         itemCount: _orders.length,
@@ -409,7 +444,7 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                               ) ??
                               0;
 
-                          // 3. 🟢 Ledger Math
+                          // 3. Ledger Math
                           final balanceDue = totalAmount - paidAmount;
                           final isPartiallyPaid =
                               orderStatus == 'pending' &&
@@ -496,7 +531,7 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                                             ),
                                             const SizedBox(width: 8),
 
-                                            // 🟢 SMART STATUS BADGE
+                                            // SMART STATUS BADGE
                                             if (isPartiallyPaid)
                                               Container(
                                                 padding:
@@ -584,7 +619,7 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                                     ),
                                   ),
 
-                                  // 🟢 FINANCIALS COLUMN (Now shows Due Balance!)
+                                  // FINANCIALS COLUMN
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -647,22 +682,16 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                                               int.tryParse(orderId) ?? 0,
                                             ),
                                       ),
+                                      // 🟢 UPDATED: Calls the _printOrder function!
                                       IconButton(
                                         icon: const Icon(Icons.print_outlined),
                                         color: Colors.blueGrey,
                                         tooltip: "Print Receipt",
                                         splashRadius: 24,
-                                        onPressed: () {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                "Printing receipt...",
-                                              ),
+                                        onPressed:
+                                            () => _printOrder(
+                                              int.tryParse(orderId) ?? 0,
                                             ),
-                                          );
-                                        },
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.delete_outline),
