@@ -20,15 +20,16 @@ class RightPaneWidget extends StatefulWidget {
 
 class _RightPaneWidgetState extends State<RightPaneWidget> {
   final TextEditingController _mobileController = TextEditingController();
+  final FocusNode _mobileFocusNode = FocusNode();
+
   bool _isLoadingCustomer = false;
   bool _isProcessingCheckout = false;
-
-  // 🟢 NEW: State variable to control printing
   bool _printReceipt = true;
 
   @override
   void dispose() {
     _mobileController.dispose();
+    _mobileFocusNode.dispose();
     super.dispose();
   }
 
@@ -40,6 +41,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
       provider.clearCustomer();
       return;
     }
+
+    // 🟢 GUARD: Prevent double-firing if scanner sends 10 digits + Enter instantly
+    if (_isLoadingCustomer) return;
 
     setState(() => _isLoadingCustomer = true);
 
@@ -72,18 +76,195 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
         _showCustomerDialog(mobile, provider, null);
       }
     } finally {
-      setState(() => _isLoadingCustomer = false);
+      if (mounted) setState(() => _isLoadingCustomer = false);
     }
+  }
+
+  // ==========================================
+  // RECENT CUSTOMERS EXTRACTOR
+  // ==========================================
+  Future<void> _showRecentCustomers(AppProvider provider) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(child: CircularProgressIndicator(color: Colors.green)),
+    );
+
+    try {
+      final res = await ApiService(context).orderList(1, 50);
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      if (res['flag'] == 1 && res['data'] != null) {
+        final orders = res['data']['result'] as List<dynamic>? ?? [];
+
+        final Map<String, Map<String, dynamic>> uniqueCustomers = {};
+        for (var o in orders) {
+          final mobile = o['order_mobile_no']?.toString() ?? '';
+          final name = o['order_username']?.toString() ?? 'Walk-in';
+          if (mobile.isNotEmpty && mobile.length >= 10 && mobile != '0000000000' && !uniqueCustomers.containsKey(mobile)) {
+            uniqueCustomers[mobile] = {'name': name, 'mobile': mobile};
+          }
+        }
+
+        final customerList = uniqueCustomers.values.toList();
+
+        if (customerList.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No recent customers found.")));
+          return;
+        }
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.history, color: Colors.blue),
+                SizedBox(width: 8),
+                Text("Recent Customers"),
+              ],
+            ),
+            content: SizedBox(
+              width: 400,
+              height: 400,
+              child: ListView.separated(
+                itemCount: customerList.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (c, i) {
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.blue.shade50,
+                      child: Icon(Icons.person, color: Colors.blue.shade700),
+                    ),
+                    title: Text(customerList[i]['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(customerList[i]['mobile']),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _mobileController.text = customerList[i]['mobile'];
+                      _mobileFocusNode.unfocus();
+                      _fetchCustomer(customerList[i]['mobile'], provider);
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      debugPrint("Failed to fetch recent customers: $e");
+    }
+  }
+
+  // ==========================================
+  // CHECKOUT GUARDRAIL DIALOG
+  // ==========================================
+  Future<bool> _promptCustomerBeforeCheckout(AppProvider provider) async {
+    if (provider.selectedCustomer != null && provider.selectedCustomer!.number.isNotEmpty && provider.selectedCustomer!.number != '0000000000') {
+      return true;
+    }
+
+    if (_mobileController.text.length == 10) {
+      _fetchCustomer(_mobileController.text, provider);
+      return false;
+    }
+
+    final TextEditingController tempMobile = TextEditingController();
+    final FocusNode tempFocus = FocusNode();
+
+    bool? result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.person_search, color: Colors.orange.shade700, size: 28),
+            const SizedBox(width: 8),
+            const Text("Missing Customer Detail"),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Are you sure you want to checkout without entering a customer? \n\nEnter mobile to add them, or hit [Enter] to skip.",
+              style: TextStyle(fontSize: 14, color: Colors.black87),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: tempMobile,
+              focusNode: tempFocus..requestFocus(),
+              keyboardType: TextInputType.phone,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(10),
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              textInputAction: TextInputAction.done,
+              onSubmitted: (val) {
+                if (val.length == 10) {
+                  Navigator.pop(ctx, true);
+                } else {
+                  Navigator.pop(ctx, false);
+                }
+              },
+              decoration: InputDecoration(
+                labelText: "Mobile Number",
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.phone),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text("Cancel Checkout", style: TextStyle(color: Colors.red)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Skip & Proceed", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+            onPressed: () {
+              if (tempMobile.text.length == 10) {
+                Navigator.pop(ctx, true);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Enter a valid 10-digit number")));
+              }
+            },
+            child: const Text("Search Customer"),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return false;
+    if (result == false) return true;
+
+    if (result == true) {
+      _mobileController.text = tempMobile.text;
+      _fetchCustomer(tempMobile.text, provider);
+      return false;
+    }
+
+    return false;
   }
 
   // ==========================================
   // SMART CUSTOMER DIALOG (New & Repeat)
   // ==========================================
   void _showCustomerDialog(
-    String mobile,
-    AppProvider provider,
-    Map<String, dynamic>? existingData,
-  ) {
+      String mobile,
+      AppProvider provider,
+      Map<String, dynamic>? existingData,
+      ) {
     final isExisting = existingData != null;
 
     final TextEditingController nameController = TextEditingController(
@@ -94,19 +275,77 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
     );
 
     final int ordersCount = isExisting ? (existingData['ordersCount'] ?? 0) : 0;
-    final String channel =
-        isExisting
-            ? (existingData['channel']?.toString().toUpperCase() ?? "UNKNOWN")
-            : "";
+    final String channel = isExisting ? (existingData['channel']?.toString().toUpperCase() ?? "UNKNOWN") : "";
 
     bool isSaving = false;
+    final FocusNode nameFocus = FocusNode();
+    final FocusNode addressFocus = FocusNode();
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (ctx, setDialogState) {
+
+            Future<void> submitCustomerForm() async {
+              if (isSaving) return;
+              setDialogState(() => isSaving = true);
+
+              String finalName = nameController.text.trim();
+              if (finalName.isEmpty) finalName = "Walk-in Customer";
+              String finalAddress = addressController.text.trim();
+
+              try {
+                final response = await ApiService(context).customerLogin(finalName, mobile, finalAddress);
+
+                if (response['flag'] == 1 || response['code'] == 200) {
+                  int finalCustomerId = provider.defaultWalkInId;
+
+                  if (response['data'] != null) {
+                    if (response['data'] is Map) {
+                      finalCustomerId = response['data']['insertId'] ?? response['data']['customer_id'] ?? response['data']['id'] ?? finalCustomerId;
+                    } else if (response['data'] is int) {
+                      finalCustomerId = response['data'];
+                    } else if (response['data'] is String) {
+                      finalCustomerId = int.tryParse(response['data']) ?? finalCustomerId;
+                    }
+                  }
+
+                  if (isExisting && finalCustomerId == provider.defaultWalkInId && existingData != null) {
+                    finalCustomerId = existingData['customer_id'] ?? existingData['id'] ?? provider.defaultWalkInId;
+                  }
+
+                  provider.setCustomer(
+                    UserModel(
+                      id: finalCustomerId,
+                      name: finalName,
+                      number: mobile,
+                      address: finalAddress,
+                    ),
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(isExisting ? "✅ Customer details confirmed! (ID: $finalCustomerId)" : "✅ New Customer Registered! (ID: $finalCustomerId)"),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } else {
+                  throw Exception(response['message'] ?? "Failed to save details");
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ Error: $e"), backgroundColor: Colors.red));
+                }
+              } finally {
+                if (mounted) setDialogState(() => isSaving = false);
+              }
+            }
+
             return AlertDialog(
               title: Row(
                 children: [
@@ -116,232 +355,114 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isExisting
-                        ? "Verify Customer Details"
-                        : "Register New Customer",
+                    isExisting ? "Verify Customer Details" : "Register New Customer",
                   ),
                 ],
               ),
               content: SizedBox(
                 width: 450,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isExisting) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.stars,
-                              color: Colors.blue,
-                              size: 32,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "REPEATE CUSTOMER",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue,
-                                      letterSpacing: 0.5,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isExisting) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.stars, color: Colors.blue, size: 32),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "REPEATE CUSTOMER",
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue, letterSpacing: 0.5),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    "$ordersCount Orders  •  Last Channel: $channel",
-                                    style: TextStyle(
-                                      color: Colors.blue.shade800,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "$ordersCount Orders  •  Last Channel: $channel",
+                                      style: TextStyle(color: Colors.blue.shade800, fontSize: 13, fontWeight: FontWeight.w500),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      TextField(
+                        controller: TextEditingController(text: mobile),
+                        enabled: false,
+                        decoration: InputDecoration(
+                          labelText: "Mobile Number",
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.phone),
+                          fillColor: Colors.grey.shade100,
+                          filled: true,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: nameController,
+                        focusNode: nameFocus..requestFocus(),
+                        textCapitalization: TextCapitalization.words,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) => addressFocus.requestFocus(),
+                        decoration: const InputDecoration(
+                          labelText: "Customer Name (Optional)",
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: addressController,
+                        focusNode: addressFocus,
+                        textCapitalization: TextCapitalization.sentences,
+                        textInputAction: TextInputAction.done,
+                        maxLines: 1,
+                        onSubmitted: (_) {
+                          submitCustomerForm();
+                        },
+                        decoration: const InputDecoration(
+                          labelText: "Address / Area (Optional)",
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on),
+                        ),
+                      ),
                     ],
-
-                    TextField(
-                      controller: TextEditingController(text: mobile),
-                      enabled: false,
-                      decoration: InputDecoration(
-                        labelText: "Mobile Number",
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.phone),
-                        fillColor: Colors.grey.shade100,
-                        filled: true,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameController,
-                      autofocus: !isExisting,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: "Customer Name (Optional)",
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: addressController,
-                      textCapitalization: TextCapitalization.sentences,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: "Address / Area (Optional)",
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_on),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed:
-                      isSaving
-                          ? null
-                          : () {
-                            _mobileController.clear();
-                            Navigator.pop(context);
-                          },
-                  child: const Text(
-                    "Cancel",
-                    style: TextStyle(color: Colors.grey),
-                  ),
+                  onPressed: isSaving ? null : () {
+                    _mobileController.clear();
+                    Navigator.pop(dialogContext);
+                  },
+                  child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isExisting
-                            ? Colors.blue.shade700
-                            : Colors.green.shade700,
+                    backgroundColor: isExisting ? Colors.blue.shade700 : Colors.green.shade700,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   ),
-                  onPressed:
-                      isSaving
-                          ? null
-                          : () async {
-                            setDialogState(() => isSaving = true);
-
-                            String finalName = nameController.text.trim();
-                            if (finalName.isEmpty) {
-                              finalName = "Walk-in Customer";
-                            }
-
-                            String finalAddress = addressController.text.trim();
-
-                            try {
-                              final response = await ApiService(
-                                context,
-                              ).customerLogin(finalName, mobile, finalAddress);
-
-                              if (response['flag'] == 1 ||
-                                  response['code'] == 200) {
-                                int finalCustomerId = provider.defaultWalkInId;
-
-                                if (response['data'] != null) {
-                                  if (response['data'] is Map) {
-                                    finalCustomerId =
-                                        response['data']['insertId'] ??
-                                        response['data']['customer_id'] ??
-                                        response['data']['id'] ??
-                                        finalCustomerId;
-                                  } else if (response['data'] is int) {
-                                    finalCustomerId = response['data'];
-                                  } else if (response['data'] is String) {
-                                    finalCustomerId =
-                                        int.tryParse(response['data']) ??
-                                        finalCustomerId;
-                                  }
-                                }
-
-                                if (isExisting &&
-                                    finalCustomerId ==
-                                        provider.defaultWalkInId &&
-                                    existingData != null) {
-                                  finalCustomerId =
-                                      existingData['customer_id'] ??
-                                      existingData['id'] ??
-                                      provider.defaultWalkInId;
-                                }
-
-                                provider.setCustomer(
-                                  UserModel(
-                                    id: finalCustomerId,
-                                    name: finalName,
-                                    number: mobile,
-                                    address: finalAddress,
-                                  ),
-                                );
-
-                                if (mounted) {
-                                  Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        isExisting
-                                            ? "✅ Customer details confirmed! (ID: $finalCustomerId)"
-                                            : "✅ New Customer Registered! (ID: $finalCustomerId)",
-                                      ),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                }
-                              } else {
-                                throw Exception(
-                                  response['message'] ??
-                                      "Failed to save details",
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text("❌ Error: $e"),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            } finally {
-                              setDialogState(() => isSaving = false);
-                            }
-                          },
-                  icon:
-                      isSaving
-                          ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                          : const Icon(Icons.check_circle),
+                  onPressed: isSaving ? null : submitCustomerForm,
+                  icon: isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.check_circle),
                   label: Text(
-                    isSaving
-                        ? "Saving..."
-                        : (isExisting ? "Confirm Details" : "Save Customer"),
+                    isSaving ? "Saving..." : (isExisting ? "Confirm Details" : "Save Customer"),
                   ),
                 ),
               ],
@@ -360,22 +481,22 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
     CartItem? specificItem,
   }) {
     DiscountType initialType =
-        specificItem != null
-            ? (specificItem.discountType == DiscountType.none
-                ? DiscountType.percent
-                : specificItem.discountType)
-            : (provider.globalDiscountType == DiscountType.none
-                ? DiscountType.percent
-                : provider.globalDiscountType);
+    specificItem != null
+        ? (specificItem.discountType == DiscountType.none
+        ? DiscountType.percent
+        : specificItem.discountType)
+        : (provider.globalDiscountType == DiscountType.none
+        ? DiscountType.percent
+        : provider.globalDiscountType);
 
     DiscountBase initialBase =
-        specificItem != null
-            ? specificItem.discountBase
-            : provider.globalDiscountBase;
+    specificItem != null
+        ? specificItem.discountBase
+        : provider.globalDiscountBase;
     double initialValue =
-        specificItem != null
-            ? specificItem.discountValue
-            : provider.globalDiscountValue;
+    specificItem != null
+        ? specificItem.discountValue
+        : provider.globalDiscountValue;
 
     final TextEditingController discountController = TextEditingController(
       text: initialValue == 0 ? "" : initialValue.toStringAsFixed(0),
@@ -419,7 +540,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                     onSelectionChanged:
                         (newSelection) => setDialogState(
                           () => selectedType = newSelection.first,
-                        ),
+                    ),
                   ),
                   const SizedBox(height: 16),
 
@@ -443,7 +564,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                     onSelectionChanged:
                         (newSelection) => setDialogState(
                           () => selectedBase = newSelection.first,
-                        ),
+                    ),
                   ),
 
                   const SizedBox(height: 16),
@@ -454,9 +575,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                     decoration: InputDecoration(
                       border: const OutlineInputBorder(),
                       labelText:
-                          selectedType == DiscountType.percent
-                              ? 'Discount %'
-                              : 'Discount Amount ₹',
+                      selectedType == DiscountType.percent
+                          ? 'Discount %'
+                          : 'Discount Amount ₹',
                     ),
                   ),
                 ],
@@ -608,12 +729,23 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
             children: [
               TextField(
                 controller: _mobileController,
+                focusNode: _mobileFocusNode,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [
                   LengthLimitingTextInputFormatter(10),
                   FilteringTextInputFormatter.digitsOnly,
                 ],
-                onChanged: (val) => _fetchCustomer(val, appProvider),
+                textInputAction: TextInputAction.search,
+                // 🟢 NEW: Auto-Trigger exactly on 10th digit
+                onChanged: (val) {
+                  if (val.length == 10) {
+                    _mobileFocusNode.unfocus(); // Drops the physical/virtual keyboard
+                    _fetchCustomer(val, appProvider);
+                  }
+                },
+                onSubmitted: (val) {
+                  if (val.length == 10) _fetchCustomer(val, appProvider);
+                },
                 decoration: InputDecoration(
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(
@@ -622,22 +754,32 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   ),
                   labelText: "Customer Mobile (Optional)",
                   prefixIcon: const Icon(Icons.phone, size: 20),
-                  suffixIcon:
-                      _isLoadingCustomer
-                          ? const Padding(
-                            padding: EdgeInsets.all(8),
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : _mobileController.text.isNotEmpty
-                          ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            splashRadius: 20,
-                            onPressed: () {
-                              _mobileController.clear();
-                              appProvider.clearCustomer();
-                            },
-                          )
-                          : null,
+                  suffixIcon: _isLoadingCustomer
+                      ? const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                      : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_mobileController.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          splashRadius: 20,
+                          onPressed: () {
+                            _mobileController.clear();
+                            appProvider.clearCustomer();
+                            _mobileFocusNode.requestFocus();
+                          },
+                        ),
+                      IconButton(
+                        icon: Icon(Icons.manage_search, color: Colors.blue.shade700, size: 22),
+                        tooltip: "Recent Customers",
+                        splashRadius: 20,
+                        onPressed: () => _showRecentCustomers(appProvider),
+                      ),
+                    ],
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -690,141 +832,141 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
         // ==========================================
         Expanded(
           child:
-              appProvider.cart.isEmpty
-                  ? Center(
-                    child: Text(
-                      "Cart is empty",
-                      style: TextStyle(
-                        color: Colors.grey.shade500,
-                        fontSize: 16,
-                      ),
+          appProvider.cart.isEmpty
+              ? Center(
+            child: Text(
+              "Cart is empty",
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 16,
+              ),
+            ),
+          )
+              : ListView.separated(
+            itemCount: appProvider.cart.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = appProvider.cart[index];
+              final rowDiscount = appProvider.getItemCalculatedDiscount(
+                item,
+              );
+              final rowFinalTotal = appProvider.getItemFinalTotal(item);
+
+              String discountDetails = "";
+              if (item.hasCustomDiscount) {
+                final valStr = item.discountValue.toStringAsFixed(
+                  item.discountValue.truncateToDouble() ==
+                      item.discountValue
+                      ? 0
+                      : 1,
+                );
+                discountDetails =
+                item.discountType == DiscountType.percent
+                    ? "($valStr% Override)"
+                    : "(₹$valStr Override)";
+              } else if (appProvider.globalDiscountValue > 0) {
+                final valStr = appProvider.globalDiscountValue
+                    .toStringAsFixed(
+                  appProvider.globalDiscountValue
+                      .truncateToDouble() ==
+                      appProvider.globalDiscountValue
+                      ? 0
+                      : 1,
+                );
+                discountDetails =
+                appProvider.globalDiscountType ==
+                    DiscountType.percent
+                    ? "($valStr% Global)"
+                    : "(₹$valStr Global)";
+              }
+
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 0,
+                ),
+                visualDensity: VisualDensity.compact,
+                title: Text(
+                  "${item.product.name} (${item.product.weight})",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "₹${item.product.price.toStringAsFixed(0)} x ${item.quantity}",
+                      style: const TextStyle(fontSize: 12),
                     ),
-                  )
-                  : ListView.separated(
-                    itemCount: appProvider.cart.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final item = appProvider.cart[index];
-                      final rowDiscount = appProvider.getItemCalculatedDiscount(
-                        item,
-                      );
-                      final rowFinalTotal = appProvider.getItemFinalTotal(item);
-
-                      String discountDetails = "";
-                      if (item.hasCustomDiscount) {
-                        final valStr = item.discountValue.toStringAsFixed(
-                          item.discountValue.truncateToDouble() ==
-                                  item.discountValue
-                              ? 0
-                              : 1,
-                        );
-                        discountDetails =
-                            item.discountType == DiscountType.percent
-                                ? "($valStr% Override)"
-                                : "(₹$valStr Override)";
-                      } else if (appProvider.globalDiscountValue > 0) {
-                        final valStr = appProvider.globalDiscountValue
-                            .toStringAsFixed(
-                              appProvider.globalDiscountValue
-                                          .truncateToDouble() ==
-                                      appProvider.globalDiscountValue
-                                  ? 0
-                                  : 1,
-                            );
-                        discountDetails =
-                            appProvider.globalDiscountType ==
-                                    DiscountType.percent
-                                ? "($valStr% Global)"
-                                : "(₹$valStr Global)";
-                      }
-
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 0,
+                    if (rowDiscount > 0)
+                      InkWell(
+                        onTap:
+                            () => _showDiscountDialog(
+                          provider: appProvider,
+                          specificItem: item,
                         ),
-                        visualDensity: VisualDensity.compact,
-                        title: Text(
-                          "${item.product.name} (${item.product.weight})",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                        child: Text(
+                          "Discount: -₹${rowDiscount.toStringAsFixed(0)} $discountDetails",
+                          style: TextStyle(
+                            color:
+                            item.hasCustomDiscount
+                                ? Colors.orange.shade700
+                                : Colors.red,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
                           ),
                         ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "₹${item.product.price.toStringAsFixed(0)} x ${item.quantity}",
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            if (rowDiscount > 0)
-                              InkWell(
-                                onTap:
-                                    () => _showDiscountDialog(
-                                      provider: appProvider,
-                                      specificItem: item,
-                                    ),
-                                child: Text(
-                                  "Discount: -₹${rowDiscount.toStringAsFixed(0)} $discountDetails",
-                                  style: TextStyle(
-                                    color:
-                                        item.hasCustomDiscount
-                                            ? Colors.orange.shade700
-                                            : Colors.red,
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              "₹${rowFinalTotal.toStringAsFixed(0)}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              icon: Icon(
-                                Icons.local_offer_outlined,
-                                color:
-                                    item.hasCustomDiscount
-                                        ? Colors.orange
-                                        : Colors.blue,
-                                size: 20,
-                              ),
-                              splashRadius: 20,
-                              onPressed:
-                                  () => _showDiscountDialog(
-                                    provider: appProvider,
-                                    specificItem: item,
-                                  ),
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.red,
-                                size: 20,
-                              ),
-                              splashRadius: 20,
-                              onPressed:
-                                  () =>
-                                      appProvider.removeCartItem(item.product),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                      ),
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "₹${rowFinalTotal.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: Icon(
+                        Icons.local_offer_outlined,
+                        color:
+                        item.hasCustomDiscount
+                            ? Colors.orange
+                            : Colors.blue,
+                        size: 20,
+                      ),
+                      splashRadius: 20,
+                      onPressed:
+                          () => _showDiscountDialog(
+                        provider: appProvider,
+                        specificItem: item,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                      splashRadius: 20,
+                      onPressed:
+                          () =>
+                          appProvider.removeCartItem(item.product),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
 
-// ==========================================
+        // ==========================================
         // 🟢 COMPACT CHECKOUT FOOTER
         // ==========================================
         if (appProvider.cart.isNotEmpty)
@@ -895,10 +1037,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // 🖨️ SLEEK PRINT BADGE (Left Side)
                     GestureDetector(
                       onTap: () {
-                        HapticFeedback.lightImpact(); // Nice physical touch feel
+                        HapticFeedback.lightImpact();
                         setState(() => _printReceipt = !_printReceipt);
                       },
                       child: AnimatedContainer(
@@ -906,7 +1047,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: _printReceipt ? Colors.blue.shade50 : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(20), // Pill shape
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: _printReceipt ? Colors.blue.shade300 : Colors.grey.shade300,
                           ),
@@ -933,7 +1074,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       ),
                     ),
 
-                    // 💰 THE TOTALS (Right Side)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -983,6 +1123,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                             ? null
                             : () async {
                           if (appProvider.cart.isEmpty) return;
+
+                          if (!await _promptCustomerBeforeCheckout(appProvider)) return;
+
                           setState(() => _isProcessingCheckout = true);
                           try {
                             final responseData = await CheckoutService.placeCashOrder(context, appProvider);
@@ -1019,7 +1162,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                             appProvider.clearCartAndCustomer();
                             _mobileController.clear();
 
-                            // 🟢 AUTO PRINT CASH ORDER (If Toggle is ON)
                             final orderIdToPrint = responseData['order_id'] ?? appProvider.editingOrderId;
 
                             if (_printReceipt && orderIdToPrint != null) {
@@ -1060,6 +1202,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                             ? null
                             : () async {
                           if (appProvider.cart.isEmpty) return;
+
+                          if (!await _promptCustomerBeforeCheckout(appProvider)) return;
+
                           setState(() => _isProcessingCheckout = true);
                           try {
                             final responseData = await CheckoutService.placeOnlineOrder(context, appProvider);
@@ -1105,7 +1250,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                     orderId: orderId,
                                     amount: amountToAsk,
                                     qrImageUrl: qrImageUrl,
-                                    willPrint: _printReceipt, // 🟢 Pass state to Dialog
+                                    willPrint: _printReceipt,
                                   ),
                                 );
 
@@ -1113,7 +1258,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                   appProvider.clearCartAndCustomer();
                                   _mobileController.clear();
 
-                                  // 🟢 AUTO PRINT ONLINE ORDER (If Toggle is ON)
                                   final orderIdToPrint = responseData['order_id'] ?? appProvider.editingOrderId;
 
                                   if (_printReceipt && orderIdToPrint != null) {
