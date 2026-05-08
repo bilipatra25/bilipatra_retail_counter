@@ -379,16 +379,16 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
 
                   if (mounted) {
                     Navigator.pop(dialogContext);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          isExisting
-                              ? "✅ Customer details confirmed! (ID: $finalCustomerId)"
-                              : "✅ New Customer Registered! (ID: $finalCustomerId)",
-                        ),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    // ScaffoldMessenger.of(context).showSnackBar(
+                    //   SnackBar(
+                    //     content: Text(
+                    //       isExisting
+                    //           ? "✅ Customer details confirmed! (ID: $finalCustomerId)"
+                    //           : "✅ New Customer Registered! (ID: $finalCustomerId)",
+                    //     ),
+                    //     backgroundColor: Colors.green,
+                    //   ),
+                    // );
                   }
                 } else {
                   throw Exception(
@@ -1641,6 +1641,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       final qrImageUrl =
                                           responseData['image_url'];
                                       if (mounted) {
+                                        // 🟢 NEW: Capture the specific string result
                                         final result =
                                             await showDialog<dynamic>(
                                               context: context,
@@ -1651,6 +1652,10 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                                     amount: amountToAsk,
                                                     qrImageUrl: qrImageUrl,
                                                     willPrint: _printReceipt,
+                                                    customerMobile:
+                                                        appProvider
+                                                            .selectedCustomer
+                                                            ?.number,
                                                   ),
                                             );
 

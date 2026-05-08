@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // 🟢 REQUIRED FOR KEYBOARD FORMATTERS
 import 'package:firebase_database/firebase_database.dart';
+import 'checkout_service.dart';
 
 class QRPaymentDialog extends StatefulWidget {
   final int orderId;
   final double amount;
   final String qrImageUrl;
   final bool willPrint;
+  final String? customerMobile;
 
   const QRPaymentDialog({
     super.key,
@@ -14,6 +17,7 @@ class QRPaymentDialog extends StatefulWidget {
     required this.amount,
     required this.qrImageUrl,
     this.willPrint = true,
+    this.customerMobile,
   });
 
   @override
@@ -23,11 +27,17 @@ class QRPaymentDialog extends StatefulWidget {
 class _QRPaymentDialogState extends State<QRPaymentDialog> {
   bool _isZoomed = true;
   bool _paymentReceived = false;
+  bool _isSendingWhatsapp = false;
   StreamSubscription<DatabaseEvent>? _orderSubscription;
+
+  // 🟢 NEW: Controller for the editable WhatsApp field
+  late TextEditingController _whatsappController;
 
   @override
   void initState() {
     super.initState();
+    // 🟢 Pre-fill it if we have it, otherwise leave it blank for Walk-ins
+    _whatsappController = TextEditingController(text: widget.customerMobile ?? '');
     _listenForPayment();
   }
 
@@ -47,8 +57,40 @@ class _QRPaymentDialogState extends State<QRPaymentDialog> {
     });
   }
 
+  // 🟢 NEW: Extracted WhatsApp sending logic
+  Future<void> _sendWhatsappLink() async {
+    final phone = _whatsappController.text.trim();
+
+    if (phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("⚠️ Please enter a valid 10-digit number"), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    setState(() => _isSendingWhatsapp = true);
+    try {
+      await CheckoutService.sendWhatsAppQR(
+          context, widget.orderId, phone, widget.qrImageUrl);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Payment Link sent via WhatsApp!"), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ Failed to send WhatsApp: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSendingWhatsapp = false);
+    }
+  }
+
   @override
   void dispose() {
+    _whatsappController.dispose();
     _orderSubscription?.cancel();
     super.dispose();
   }
@@ -187,6 +229,51 @@ class _QRPaymentDialogState extends State<QRPaymentDialog> {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+
+                  // 🟢 NEW: Editable WhatsApp Field (Visible for EVERYONE!)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: TextField(
+                            controller: _whatsappController,
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              LengthLimitingTextInputFormatter(10),
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: InputDecoration(
+                              labelText: "WhatsApp Number",
+                              prefixIcon: const Icon(Icons.wechat, color: Colors.green),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSendingWhatsapp ? null : _sendWhatsappLink,
+                          icon: _isSendingWhatsapp
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.send, size: 18),
+                          label: const Text("Send Link", style: TextStyle(fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
                   Row(
                     children: [
                       Expanded(
