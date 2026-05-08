@@ -1469,39 +1469,20 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
 
                                       if (action == 'refund_online_auto') {
                                         if (mounted) {
-                                          ScaffoldMessenger.of(
+                                          _showAutoRefundSuccessDialog(
                                             context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                "✅ ₹${delta.abs().toStringAsFixed(2)} automatically refunded to customer's bank via Razorpay!",
-                                              ),
-                                              backgroundColor:
-                                                  Colors.green.shade800,
-                                              duration: const Duration(
-                                                seconds: 5,
-                                              ),
-                                            ),
+                                            delta.abs(),
                                           );
                                         }
                                       } else if (action == 'refund_manual' ||
                                           action == 'refund') {
                                         _showRefundAlert(context, delta.abs());
                                       } else if (action == 'collect') {
+                                        // 🟢 NEW: Triggers the mandatory acknowledgment dialog
                                         if (mounted) {
-                                          ScaffoldMessenger.of(
+                                          _showCollectCashDialog(
                                             context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                "⚠️ Order Updated. Please collect extra ₹${delta.toStringAsFixed(2)} in CASH.",
-                                              ),
-                                              backgroundColor:
-                                                  Colors.orange.shade800,
-                                              duration: const Duration(
-                                                seconds: 6,
-                                              ),
-                                            ),
+                                            delta,
                                           );
                                         }
                                       }
@@ -1633,19 +1614,10 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       if (action == 'refund_online_auto') {
                                         showQrDialog = false;
                                         if (mounted) {
-                                          ScaffoldMessenger.of(
+                                          // 🟢 FIXED: Now uses the hard Dialog instead of SnackBar!
+                                          _showAutoRefundSuccessDialog(
                                             context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                "✅ ₹${delta.abs().toStringAsFixed(2)} automatically refunded to customer's bank via Razorpay!",
-                                              ),
-                                              backgroundColor:
-                                                  Colors.green.shade800,
-                                              duration: const Duration(
-                                                seconds: 5,
-                                              ),
-                                            ),
+                                            delta.abs(),
                                           );
                                         }
                                       } else if (action == 'refund_manual' ||
@@ -1655,6 +1627,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       } else if (action == 'none') {
                                         showQrDialog = false;
                                       } else if (action == 'collect') {
+                                        // 🟢 Correct for UPI: Opens the QR dialog for the extra amount
                                         amountToAsk = delta;
                                       }
                                     }
@@ -1668,7 +1641,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       final qrImageUrl =
                                           responseData['image_url'];
                                       if (mounted) {
-                                        // 🟢 NEW: Capture the specific string result
                                         final result =
                                             await showDialog<dynamic>(
                                               context: context,
@@ -1682,7 +1654,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                                   ),
                                             );
 
-                                        // 🟢 Action 1: Cashier Verified Payment
                                         if (result == 'paid' ||
                                             result == true) {
                                           appProvider.clearCartAndCustomer();
@@ -1712,9 +1683,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                               ),
                                             );
                                           }
-                                        }
-                                        // 🟢 Action 2: Customer Walked Away / Cancelled
-                                        else if (result == 'cancel_order') {
+                                        } else if (result == 'cancel_order') {
                                           try {
                                             await ApiService(
                                               context,
@@ -1749,11 +1718,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                             }
                                           }
                                         }
-                                        // 🟢 Action 3: (result == 'close' or null)
-                                        // If they click "Back to Cart", we intentionally do nothing!
-                                        // The cart stays active so they can hit "Pay Cash" instead.
                                       }
                                     } else {
+                                      // If showQrDialog is false (because it was a refund or exact match)
                                       appProvider.clearCartAndCustomer();
                                       _mobileController.clear();
                                       if (mounted) {
@@ -1854,6 +1821,90 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 child: const Text(
                   "I have refunded the amount",
                   style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // 🟢 NEW: Proper Dialog for Auto-Refunds (Replaces SnackBar)
+  void _showAutoRefundSuccessDialog(BuildContext context, double amount) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Force them to acknowledge it
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            icon: const Icon(Icons.check_circle, color: Colors.green, size: 60),
+            title: const Text("Instant Refund Initiated"),
+            content: Text(
+              "₹${amount.toStringAsFixed(2)} has been successfully refunded to the customer's bank account.\n\nA confirmation WhatsApp message has been sent to them.",
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, height: 1.4),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 40,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  "Done",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // 🟢 NEW: Proper Dialog for Collecting Extra Cash
+  void _showCollectCashDialog(BuildContext context, double amount) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Forces the cashier to acknowledge it
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            icon: Icon(Icons.add_card, color: Colors.orange.shade700, size: 60),
+            title: const Text("Collect Additional Cash"),
+            content: Text(
+              "The updated order total is higher than the original.\n\nPlease collect an extra ₹${amount.toStringAsFixed(2)} in CASH from the customer.",
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, height: 1.4),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 40,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  "I have collected the cash",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ],
