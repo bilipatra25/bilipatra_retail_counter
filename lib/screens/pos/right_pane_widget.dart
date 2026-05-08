@@ -186,7 +186,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
   // ==========================================
   Future<bool> _promptCustomerBeforeCheckout(AppProvider provider) async {
     // If a customer is already assigned (and isn't the default walk-in id), proceed instantly.
-    if (provider.selectedCustomer != null && provider.selectedCustomer!.number.isNotEmpty && provider.selectedCustomer!.number != '0000000000') {
+    if (provider.selectedCustomer != null &&
+        provider.selectedCustomer!.number.isNotEmpty &&
+        provider.selectedCustomer!.number != '0000000000') {
       return true;
     }
 
@@ -201,75 +203,86 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
 
     bool? result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.person_search, color: Colors.orange.shade700, size: 28),
-            const SizedBox(width: 8),
-            const Text("Missing Customer Detail"),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Are you sure you want to checkout without entering a customer? \n\nEnter mobile to add them, or hit [Enter] to skip.",
-              style: TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: tempMobile,
-              focusNode: tempFocus..requestFocus(), // Auto-focuses for physical keyboard
-              keyboardType: TextInputType.phone,
-              inputFormatters: [
-                LengthLimitingTextInputFormatter(10),
-                FilteringTextInputFormatter.digitsOnly,
+      builder:
+          (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  Icons.person_search,
+                  color: Colors.orange.shade700,
+                  size: 28,
+                ),
+                const SizedBox(width: 8),
+                const Text("Missing Customer Detail"),
               ],
-              textInputAction: TextInputAction.done,
-              // 🟢 NEW: Auto-Trigger exactly on 10th digit
-              onChanged: (val) {
-                if (val.length == 10) {
-                  Navigator.pop(ctx, true); // Instantly search this number
-                }
-              },
-              onSubmitted: (val) {
-                if (val.length == 10) {
-                  Navigator.pop(ctx, true); // Search this number
-                } else {
-                  Navigator.pop(ctx, false); // Skip
-                }
-              },
-              decoration: InputDecoration(
-                labelText: "Mobile Number",
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.phone),
-                filled: true,
-                fillColor: Colors.grey.shade50,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Are you sure you want to checkout without entering a customer? \n\nEnter mobile to add them, or hit [Enter] to skip.",
+                  style: TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: tempMobile,
+                  focusNode:
+                      tempFocus
+                        ..requestFocus(), // Auto-focuses for physical keyboard
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(10),
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  textInputAction: TextInputAction.done,
+                  // 🟢 NEW: Auto-Trigger exactly on 10th digit
+                  onChanged: (val) {
+                    if (val.length == 10) {
+                      Navigator.pop(ctx, true); // Instantly search this number
+                    }
+                  },
+                  onSubmitted: (val) {
+                    if (val.length == 10) {
+                      Navigator.pop(ctx, true); // Search this number
+                    } else {
+                      Navigator.pop(ctx, false); // Skip
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: "Mobile Number",
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.phone),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: const Text(
+                  "Cancel Checkout",
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, null),
-            child: const Text("Cancel Checkout", style: TextStyle(color: Colors.red)),
+              // 🟢 UPDATED: Promoted to primary button since "Search" was removed
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueGrey.shade600,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text("Skip & Proceed"),
+              ),
+            ],
           ),
-          // 🟢 UPDATED: Promoted to primary button since "Search" was removed
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueGrey.shade600,
-                foregroundColor: Colors.white
-            ),
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Skip & Proceed"),
-          ),
-        ],
-      ),
     );
 
     if (result == null) return false; // Cashier hit Cancel Checkout
-    if (result == false) return true; // Cashier hit Skip, allow checkout to proceed
+    if (result == false)
+      return true; // Cashier hit Skip, allow checkout to proceed
 
     if (result == true) {
       // Cashier entered a number. Set it, fetch it, and abort the checkout
@@ -591,6 +604,8 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
       text: initialValue == 0 ? "" : initialValue.toStringAsFixed(0),
     );
 
+    final FocusNode inputFocus = FocusNode();
+
     DiscountType selectedType = initialType;
     DiscountBase selectedBase = initialBase;
 
@@ -599,77 +614,226 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            void applyDiscount() {
+              final val = double.tryParse(discountController.text) ?? 0;
+              if (specificItem != null) {
+                provider.applyItemDiscount(
+                  specificItem.product,
+                  val > 0 ? selectedType : DiscountType.none,
+                  val,
+                  selectedBase,
+                );
+              } else {
+                provider.applyCartDiscount(
+                  val > 0 ? selectedType : DiscountType.none,
+                  val,
+                  selectedBase,
+                );
+              }
+              Navigator.pop(context);
+            }
+
+            // Custom Modern Pill Buttons for Toggles (Keeps layout compact)
+            Widget buildToggleButton(
+              String text,
+              bool isSelected,
+              VoidCallback onTap,
+            ) {
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    onTap();
+                    inputFocus.requestFocus(); // Keep physical keyboard active
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    decoration: BoxDecoration(
+                      color:
+                          isSelected
+                              ? Colors.blue.shade700
+                              : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color:
+                            isSelected
+                                ? Colors.blue.shade700
+                                : Colors.grey.shade300,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black87,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
             return AlertDialog(
-              title: Text(
-                specificItem != null
-                    ? 'Item Discount: ${specificItem.product.name}'
-                    : 'Global Cart Discount',
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              titlePadding: const EdgeInsets.only(
+                top: 20,
+                left: 24,
+                right: 24,
+                bottom: 12,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 8,
+              ),
+              actionsPadding: const EdgeInsets.only(
+                bottom: 20,
+                right: 24,
+                left: 24,
+                top: 12,
+              ),
+              title: Row(
                 children: [
-                  const Text(
-                    "Discount Type:",
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.local_offer,
+                      color: Colors.blue.shade700,
+                      size: 24,
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  SegmentedButton<DiscountType>(
-                    segments: const [
-                      ButtonSegment(
-                        value: DiscountType.percent,
-                        label: Text("Percent (%)"),
-                      ),
-                      ButtonSegment(
-                        value: DiscountType.flat,
-                        label: Text("Flat (₹)"),
-                      ),
-                    ],
-                    selected: {selectedType},
-                    onSelectionChanged:
-                        (newSelection) => setDialogState(
-                          () => selectedType = newSelection.first,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    "Apply On:",
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 4),
-                  SegmentedButton<DiscountBase>(
-                    segments: const [
-                      ButtonSegment(
-                        value: DiscountBase.mrp,
-                        label: Text("MRP"),
-                      ),
-                      ButtonSegment(
-                        value: DiscountBase.sellingPrice,
-                        label: Text("Selling Price"),
-                      ),
-                    ],
-                    selected: {selectedBase},
-                    onSelectionChanged:
-                        (newSelection) => setDialogState(
-                          () => selectedBase = newSelection.first,
-                        ),
-                  ),
-
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: discountController,
-                    keyboardType: TextInputType.number,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
-                      labelText:
-                          selectedType == DiscountType.percent
-                              ? 'Discount %'
-                              : 'Discount Amount ₹',
+                  const SizedBox(width: 12),
+                  Text(
+                    specificItem != null ? 'Item Discount' : 'Global Discount',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
                     ),
                   ),
                 ],
+              ),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(6.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. 🟢 Standard Material TextField (Restored!)
+                        TextField(
+                          controller: discountController,
+                          focusNode: inputFocus..requestFocus(),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => applyDiscount(),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Discount Value',
+                            prefixText:
+                                selectedType == DiscountType.flat ? '₹ ' : '',
+                            suffixText:
+                                selectedType == DiscountType.percent ? '%' : '',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.blue.shade50,
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // 2. 🟢 Discount Type Toggles
+                        const Text(
+                          "DISCOUNT TYPE",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            buildToggleButton(
+                              "Percentage (%)",
+                              selectedType == DiscountType.percent,
+                              () {
+                                setDialogState(
+                                  () => selectedType = DiscountType.percent,
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 12),
+                            buildToggleButton(
+                              "Flat Amount (₹)",
+                              selectedType == DiscountType.flat,
+                              () {
+                                setDialogState(
+                                  () => selectedType = DiscountType.flat,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // 3. 🟢 Calculate From Toggles
+                        const Text(
+                          "CALCULATE FROM",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            buildToggleButton(
+                              "Selling Price",
+                              selectedBase == DiscountBase.sellingPrice,
+                              () {
+                                setDialogState(
+                                  () =>
+                                      selectedBase = DiscountBase.sellingPrice,
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 12),
+                            buildToggleButton(
+                              "MRP",
+                              selectedBase == DiscountBase.mrp,
+                              () {
+                                setDialogState(
+                                  () => selectedBase = DiscountBase.mrp,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
               actions: [
                 TextButton(
@@ -692,33 +856,29 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   },
                   child: const Text(
                     'Clear / Remove',
-                    style: TextStyle(color: Colors.red),
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors.green.shade700,
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  onPressed: () {
-                    final val = double.tryParse(discountController.text) ?? 0;
-                    if (specificItem != null) {
-                      provider.applyItemDiscount(
-                        specificItem.product,
-                        val > 0 ? selectedType : DiscountType.none,
-                        val,
-                        selectedBase,
-                      );
-                    } else {
-                      provider.applyCartDiscount(
-                        val > 0 ? selectedType : DiscountType.none,
-                        val,
-                        selectedBase,
-                      );
-                    }
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Apply'),
+                  onPressed: applyDiscount,
+                  child: const Text(
+                    'Apply Discount',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
               ],
             );
