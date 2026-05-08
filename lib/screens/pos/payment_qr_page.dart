@@ -98,15 +98,28 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     await prefs.setBool("auto_print_enabled", value);
   }
 
+  // 🟢 NEW: Auto-Listen to Firebase, instantly update UI without auto-closing
   void _listenToOrders() {
     debugPrint("👂 Listening to Firebase orders...");
 
-    _addedSub = _ordersRef.onChildAdded.listen((event) {
+    // 🟢 UPDATED: Fetch the 5 most recent orders to ensure we don't miss simultaneous checkouts
+    _addedSub = _ordersRef.orderByChild('createdAt').limitToLast(5).onChildAdded.listen((event) {
       if (mounted) _updateOrderData(event.snapshot, isNew: true);
     });
 
     _changedSub = _ordersRef.onChildChanged.listen((event) {
-      if (mounted) _updateOrderData(event.snapshot);
+      if (mounted) {
+        // 🟢 PREVENT SPAM: Only process changes if it matches our CURRENT order,
+        // or if it's a completely new active order taking priority.
+        final rawData = event.snapshot.value;
+        if (rawData is Map) {
+          final changedOrderId = rawData['orderId']?.toString();
+
+          if (_currentOrder == null || _currentOrder?['orderId'].toString() == changedOrderId) {
+            _updateOrderData(event.snapshot);
+          }
+        }
+      }
     });
 
     // Failsafe: Stop initial full-page loader after timeout
@@ -171,11 +184,17 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     Map<String, dynamic> data, {
     bool shouldAutoPrint = false,
   }) async {
+    final newOrderId = data['orderId'].toString();
+
+    // 🟢 PREVENT SPAM: If we already have this specific order fully loaded,
+    // just update the UI state (paid/expired) and skip the heavy HTTP API call!
+    final bool needsApiFetch = order == null || order!.orderId != newOrderId;
+
     setState(() {
       _currentOrder = data;
       isPaid = data['paid'] == true;
       isExpired = false;
-      isOrderLoading = true;
+      if (needsApiFetch) isOrderLoading = true;
     });
 
     if (data['createdAt'] != null) {
@@ -190,12 +209,19 @@ class _PaymentQRPageState extends State<PaymentQRPage> {
     }
 
     try {
-      final loadedOrder = await _loadOrderDetails(data['orderId'].toString());
-      if (mounted) {
-        setState(() {
-          order = loadedOrder;
-          isOrderLoading = false;
-        });
+      OrderModelResponse? loadedOrder = order;
+
+      // 🟢 Only hit the API if we don't already have the receipt data for this ID
+      if (needsApiFetch) {
+        debugPrint("🌐 Fetching full receipt data for Order #$newOrderId");
+        loadedOrder = await _loadOrderDetails(newOrderId);
+
+        if (mounted) {
+          setState(() {
+            order = loadedOrder;
+            isOrderLoading = false;
+          });
+        }
       }
 
       if (_autoPrintEnabled && shouldAutoPrint && loadedOrder != null) {
