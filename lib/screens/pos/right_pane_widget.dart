@@ -1243,7 +1243,8 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                             if (showQrDialog) {
                               final qrImageUrl = responseData['image_url'];
                               if (mounted) {
-                                final isPaid = await showDialog<bool>(
+                                // 🟢 NEW: Capture the specific string result
+                                final result = await showDialog<dynamic>(
                                   context: context,
                                   barrierDismissible: false,
                                   builder: (context) => QRPaymentDialog(
@@ -1254,12 +1255,12 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                   ),
                                 );
 
-                                if (isPaid == true) {
+                                // 🟢 Action 1: Cashier Verified Payment
+                                if (result == 'paid' || result == true) {
                                   appProvider.clearCartAndCustomer();
                                   _mobileController.clear();
 
                                   final orderIdToPrint = responseData['order_id'] ?? appProvider.editingOrderId;
-
                                   if (_printReceipt && orderIdToPrint != null) {
                                     _fetchAndPrintOrder(int.parse(orderIdToPrint.toString()));
                                   }
@@ -1270,6 +1271,28 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                     );
                                   }
                                 }
+                                // 🟢 Action 2: Customer Walked Away / Cancelled
+                                else if (result == 'cancel_order') {
+                                  try {
+                                    await ApiService(context).cancelOrder(orderId);
+                                    appProvider.clearCartAndCustomer();
+                                    _mobileController.clear();
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text("🚫 Order Cancelled Entirely"), backgroundColor: Colors.orange),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text("❌ Failed to cancel order: $e"), backgroundColor: Colors.red),
+                                      );
+                                    }
+                                  }
+                                }
+                                // 🟢 Action 3: (result == 'close' or null)
+                                // If they click "Back to Cart", we intentionally do nothing!
+                                // The cart stays active so they can hit "Pay Cash" instead.
                               }
                             } else {
                               appProvider.clearCartAndCustomer();
