@@ -7,8 +7,10 @@ import '../../providers/app_provider.dart';
 import '../../services/api_service.dart';
 
 class CheckoutService {
-
-  static Future<Map<String, dynamic>> placeCashOrder(BuildContext context, AppProvider provider) async {
+  static Future<Map<String, dynamic>> placeCashOrder(
+    BuildContext context,
+    AppProvider provider,
+  ) async {
     final Map<String, dynamic> payload = _buildPayload(provider, "cash");
 
     debugPrint("📦 Sending Cash Payload to API: ${jsonEncode(payload)}");
@@ -22,7 +24,10 @@ class CheckoutService {
     }
   }
 
-  static Future<Map<String, dynamic>> placeOnlineOrder(BuildContext context, AppProvider provider) async {
+  static Future<Map<String, dynamic>> placeOnlineOrder(
+    BuildContext context,
+    AppProvider provider,
+  ) async {
     final Map<String, dynamic> payload = _buildPayload(provider, "online");
 
     debugPrint("📦 Sending Online Payload to API: ${jsonEncode(payload)}");
@@ -37,28 +42,36 @@ class CheckoutService {
   }
 
   // 🟢 HELPER: Keeps your code DRY so we don't repeat the payload building logic
-  static Map<String, dynamic> _buildPayload(AppProvider provider, String orderType) {
+  static Map<String, dynamic> _buildPayload(
+    AppProvider provider,
+    String orderType,
+  ) {
     final payload = <String, dynamic>{
       "order_type": orderType,
       "customer_id": provider.activeCustomerId,
-      "discount_percent": provider.globalDiscountType == DiscountType.percent
-          ? provider.globalDiscountValue
-          : 0.0,
-      "product_list": provider.cart.map((item) {
-        double baseTotal = item.discountBase == DiscountBase.mrp
-            ? item.totalMrp
-            : item.totalSellingPrice;
-        return {
-          "product_id": item.product.id,
-          "qty": item.quantity,
-          "unit": "pcs",
-          "discount": item.discountType == DiscountType.percent
-              ? item.discountValue
-              : (item.discountType == DiscountType.flat && baseTotal > 0)
-              ? (item.discountValue / baseTotal) * 100
+      "discount_percent":
+          provider.globalDiscountType == DiscountType.percent
+              ? provider.globalDiscountValue
               : 0.0,
-        };
-      }).toList(),
+      "product_list":
+          provider.cart.map((item) {
+            double baseTotal =
+                item.discountBase == DiscountBase.mrp
+                    ? item.totalMrp
+                    : item.totalSellingPrice;
+            return {
+              "product_id": item.product.id,
+              "qty": item.quantity,
+              "unit": "pcs",
+              "discount":
+                  item.discountType == DiscountType.percent
+                      ? item.discountValue
+                      : (item.discountType == DiscountType.flat &&
+                          baseTotal > 0)
+                      ? (item.discountValue / baseTotal) * 100
+                      : 0.0,
+            };
+          }).toList(),
     };
 
     // 🟢 CRITICAL: Inject order_id if we are editing!
@@ -69,15 +82,24 @@ class CheckoutService {
     return payload;
   }
 
-  static Future<bool> sendWhatsAppQR(BuildContext context, int orderId, String mobileNo, String qrUrl) async {
-    final payload = {
-      "order_id": orderId,
-      "mobile_no": mobileNo,
-      "qr_url": qrUrl,
-    };
-    debugPrint("💬 Triggering WhatsApp API: ${jsonEncode(payload)}");
+  // Inside checkout_service.dart
+  static Future<bool> sendWhatsAppQR(
+    BuildContext context,
+    int orderId,
+    String mobile,
+    String
+    qrImageUrl, // We keep this parameter so the UI doesn't break, but we don't need to send it to the backend!
+  ) async {
+    try {
+      // 🟢 Use the unified API method!
+      final response = await ApiService(
+        context,
+      ).sendPaymentWhatsapp(orderId, mobile);
 
-    final apiService = ApiService(context);
-    return await apiService.sendQrWhatsApp(payload);
+      return response['flag'] == 1 || response['code'] == 200;
+    } catch (e) {
+      debugPrint("Error sending WhatsApp QR: $e");
+      rethrow;
+    }
   }
 }

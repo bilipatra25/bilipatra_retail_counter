@@ -428,7 +428,10 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> data) async {
-    final response = await _postRequest('retailcounter_order/v1/apiinsert', data);
+    final response = await _postRequest(
+      'retailcounter_order/v1/apiinsert',
+      data,
+    );
     if (response['flag'] == 1 && response['code'] == 200) {
       return response['data'] ?? {}; // 🟢 Added fallback for empty data objects
     } else {
@@ -439,7 +442,10 @@ class ApiService {
   // 🟢 NEW: The Update Route
   Future<Map<String, dynamic>> updateOrder(Map<String, dynamic> data) async {
     // Note: Double check if your backend uses 'apiupdate' or 'update' for this endpoint!
-    final response = await _postRequest('retailcounter_order/v1/apiupdate', data);
+    final response = await _postRequest(
+      'retailcounter_order/v1/apiupdate',
+      data,
+    );
     if (response['flag'] == 1 && response['code'] == 200) {
       return response['data'] ?? {};
     } else {
@@ -493,15 +499,6 @@ class ApiService {
     return config;
   }
 
-  Future<bool> sendQrWhatsApp(Map<String, dynamic> data) async {
-    // Note: Update this endpoint string if your Node.js route is named differently
-    final response = await _postRequest(
-      'retailcounter_order/v1/send_qr_whatsapp',
-      data,
-    );
-    return response['flag'] == 1 && response['code'] == 200;
-  }
-
   Future<Map<String, dynamic>> cancelOrder(int orderId) async {
     return await _postRequest("retailcounter_order/v1/delete", {
       'order_id': orderId,
@@ -509,11 +506,25 @@ class ApiService {
   }
 
   // 🟢 NEW: Fetch Dashboard Report Data
-  Future<Map<String, dynamic>> getDashboardReport(String startDate, String endDate) async {
-    final response = await _postRequest('retailcounter_order/v1/TotalOrderReport', {
-      "start_date": startDate,
-      "end_date": endDate,
-    });
+  Future<Map<String, dynamic>> getDashboardReport(
+    String startDate,
+    String endDate,
+  ) async {
+    final response = await _postRequest(
+      'retailcounter_order/v1/TotalOrderReport',
+      {"start_date": startDate, "end_date": endDate},
+    );
+    return response;
+  }
+
+  Future<Map<String, dynamic>> sendPaymentWhatsapp(
+    int orderId,
+    String mobileNo,
+  ) async {
+    final response = await _postRequest(
+      'retailcounter_order/v1/send-payment-whatsapp',
+      {"order_id": orderId, "mobile_no": mobileNo},
+    );
     return response;
   }
 }

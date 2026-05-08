@@ -43,7 +43,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
 
       Map<String, dynamic>? customerData;
 
-      // 🟢 Parse your specific API response structure
       if (response['flag'] == 1 &&
           response['code'] == 200 &&
           response['data'] != null) {
@@ -53,7 +52,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
         }
       }
 
-      // 🟢 Always pop the dialog, passing data if they are a repeat customer
       if (mounted) {
         _showCustomerDialog(mobile, provider, customerData);
       }
@@ -61,12 +59,11 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
       debugPrint("API Error fetching customer: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text("Network error checking customer."),
             backgroundColor: Colors.red,
           ),
         );
-        // Fallback: Let them manually enter data if network fails but they still want to try
         _showCustomerDialog(mobile, provider, null);
       }
     } finally {
@@ -84,7 +81,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
   ) {
     final isExisting = existingData != null;
 
-    // Auto-fill controllers if data exists
     final TextEditingController nameController = TextEditingController(
       text: isExisting ? existingData['name'] : "",
     );
@@ -92,7 +88,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
       text: isExisting ? existingData['address'] : "",
     );
 
-    // Extract loyalty stats
     final int ordersCount = isExisting ? (existingData['ordersCount'] ?? 0) : 0;
     final String channel =
         isExisting
@@ -127,7 +122,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 🟢 REPEATE CUSTOMER LOYALTY BANNER
                     if (isExisting) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -177,10 +171,9 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       const SizedBox(height: 20),
                     ],
 
-                    // Input Fields
                     TextField(
                       controller: TextEditingController(text: mobile),
-                      enabled: false, // Lock mobile number
+                      enabled: false,
                       decoration: InputDecoration(
                         labelText: "Mobile Number",
                         border: const OutlineInputBorder(),
@@ -190,14 +183,12 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // ... (inside _showCustomerDialog) ...
                     TextField(
                       controller: nameController,
                       autofocus: !isExisting,
                       textCapitalization: TextCapitalization.words,
                       decoration: const InputDecoration(
-                        labelText:
-                            "Customer Name (Optional)", // 🟢 Removed the *
+                        labelText: "Customer Name (Optional)",
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.person),
                       ),
@@ -208,8 +199,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       textCapitalization: TextCapitalization.sentences,
                       maxLines: 2,
                       decoration: const InputDecoration(
-                        labelText:
-                            "Address / Area (Optional)", // 🟢 Made explicit
+                        labelText: "Address / Area (Optional)",
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.location_on),
                       ),
@@ -247,11 +237,8 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       isSaving
                           ? null
                           : () async {
-                            // 🔴 REMOVED the strict isEmpty validation block here!
-
                             setDialogState(() => isSaving = true);
 
-                            // 🟢 NEW: Add a fallback name if the cashier leaves it blank
                             String finalName = nameController.text.trim();
                             if (finalName.isEmpty) {
                               finalName = "Walk-in Customer";
@@ -262,17 +249,12 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                             try {
                               final response = await ApiService(
                                 context,
-                              ).customerLogin(
-                                finalName, // 🟢 Use the fallback variable
-                                mobile,
-                                finalAddress,
-                              );
+                              ).customerLogin(finalName, mobile, finalAddress);
 
                               if (response['flag'] == 1 ||
                                   response['code'] == 200) {
                                 int finalCustomerId = provider.defaultWalkInId;
 
-                                // 1. First, check if the insert API returned the new ID
                                 if (response['data'] != null) {
                                   if (response['data'] is Map) {
                                     finalCustomerId =
@@ -289,7 +271,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                   }
                                 }
 
-                                // 2. If existing customer and no ID returned, pull from original data
                                 if (isExisting &&
                                     finalCustomerId ==
                                         provider.defaultWalkInId &&
@@ -300,12 +281,10 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       provider.defaultWalkInId;
                                 }
 
-                                // Assign to cart using the safe fallback variables
                                 provider.setCustomer(
                                   UserModel(
                                     id: finalCustomerId,
-                                    name:
-                                        finalName, // 🟢 Use the fallback variable
+                                    name: finalName,
                                     number: mobile,
                                     address: finalAddress,
                                   ),
@@ -547,10 +526,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
         if (appProvider.isEditingOrder)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ), // 📉 Tighter padding
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.orange.shade50,
               border: Border(
@@ -566,7 +542,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       Icons.edit_note,
                       color: Colors.orange.shade900,
                       size: 22,
-                    ), // 📉 Smaller icon
+                    ),
                     const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,14 +553,14 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                             fontWeight: FontWeight.bold,
                             color: Colors.orange.shade900,
                             fontSize: 13,
-                          ), // 📉 Smaller font
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
                 SizedBox(
-                  height: 30, // 📉 Force button to be tiny
+                  height: 30,
                   child: ElevatedButton.icon(
                     onPressed: () {
                       appProvider.clearCartAndCustomer();
@@ -618,7 +594,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
         // 🟢 COMPACT CUSTOMER HEADER
         // ==========================================
         Container(
-          padding: const EdgeInsets.all(10), // 📉 Tighter padding
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -634,11 +610,11 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 ],
                 onChanged: (val) => _fetchCustomer(val, appProvider),
                 decoration: InputDecoration(
-                  isDense: true, // 📉 CRITICAL: Makes the text field shorter!
+                  isDense: true,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 10,
-                  ), // 📉 Smaller internal padding
+                  ),
                   labelText: "Customer Mobile (Optional)",
                   prefixIcon: const Icon(Icons.phone, size: 20),
                   suffixIcon:
@@ -663,7 +639,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 ),
               ),
 
-              // Verification Badge UI (Also made more compact)
               if (user != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -762,7 +737,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 0,
-                        ), // 📉 Tighter padding
+                        ),
                         visualDensity: VisualDensity.compact,
                         title: Text(
                           "${item.product.name} (${item.product.weight})",
@@ -849,10 +824,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
         // ==========================================
         if (appProvider.cart.isNotEmpty)
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 10,
-            ), // 📉 Tighter vertical padding
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
@@ -865,7 +837,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
             ),
             child: Column(
               children: [
-                // Combine Global Discount Button with Gross Total to save a whole line of height!
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -912,7 +883,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   ],
                 ),
 
-                const SizedBox(height: 4), // 📉 Tiny gap
+                const SizedBox(height: 4),
 
                 if (appProvider.cartTotalDiscount > 0)
                   Row(
@@ -929,7 +900,8 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                     ],
                   ),
 
-                const Divider(height: 12), // 📉 Tighter divider
+                const Divider(height: 12),
+
                 // 🟢 DYNAMIC LEDGER UI (Condensed)
                 if (appProvider.isEditingOrder &&
                     appProvider.previouslyPaidAmount > 0) ...[
@@ -1029,7 +1001,8 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   ),
                 ],
 
-                const SizedBox(height: 10), // 📉 Tighter gap before buttons
+                const SizedBox(height: 10),
+
                 // 🟢 SQUASHED CHECKOUT BUTTONS
                 Row(
                   children: [
@@ -1061,7 +1034,28 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                           ) ??
                                           0.0;
 
-                                      if (action == 'refund') {
+                                      // 🟢 ONLINE AUTO-REFUND (Razorpay Handled It!)
+                                      if (action == 'refund_online_auto') {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                "✅ ₹${delta.abs().toStringAsFixed(2)} automatically refunded to customer's bank via Razorpay!",
+                                              ),
+                                              backgroundColor:
+                                                  Colors.green.shade800,
+                                              duration: const Duration(
+                                                seconds: 5,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                      // 🟢 MANUAL REFUND (Cashier must open drawer)
+                                      else if (action == 'refund_manual' ||
+                                          action == 'refund') {
                                         _showRefundAlert(context, delta.abs());
                                       } else if (action == 'collect') {
                                         if (mounted) {
@@ -1139,9 +1133,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                          ), // 📉 CRITICAL: Shrinks button height!
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           backgroundColor: Colors.green.shade700,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
@@ -1167,8 +1159,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                           appProvider,
                                         );
                                     final orderId = responseData['order_id'];
-                                    final currentMobile =
-                                        _mobileController.text;
 
                                     bool showQrDialog = true;
                                     double amountToAsk =
@@ -1192,7 +1182,29 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                           ) ??
                                           0.0;
 
-                                      if (action == 'refund') {
+                                      // 🟢 ONLINE AUTO-REFUND (Razorpay Handled It!)
+                                      if (action == 'refund_online_auto') {
+                                        showQrDialog = false;
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                "✅ ₹${delta.abs().toStringAsFixed(2)} automatically refunded to customer's bank via Razorpay!",
+                                              ),
+                                              backgroundColor:
+                                                  Colors.green.shade800,
+                                              duration: const Duration(
+                                                seconds: 5,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                      // 🟢 MANUAL REFUND (Cashier must open drawer)
+                                      else if (action == 'refund_manual' ||
+                                          action == 'refund') {
                                         showQrDialog = false;
                                         _showRefundAlert(context, delta.abs());
                                       } else if (action == 'none') {
@@ -1219,17 +1231,13 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                                 orderId: orderId,
                                                 amount: amountToAsk,
                                                 qrImageUrl: qrImageUrl,
-                                                initialMobile:
-                                                    currentMobile.isNotEmpty
-                                                        ? currentMobile
-                                                        : null,
                                               ),
                                         );
 
                                         if (isPaid == true) {
                                           appProvider.clearCartAndCustomer();
                                           _mobileController.clear();
-                                          if (mounted)
+                                          if (mounted) {
                                             ScaffoldMessenger.of(
                                               context,
                                             ).showSnackBar(
@@ -1240,6 +1248,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                                 backgroundColor: Colors.green,
                                               ),
                                             );
+                                          }
                                         }
                                       }
                                     } else {
@@ -1297,9 +1306,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                          ), // 📉 CRITICAL: Shrinks button height!
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           backgroundColor: Colors.blueAccent.shade700,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
