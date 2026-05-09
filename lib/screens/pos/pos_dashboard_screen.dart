@@ -5,27 +5,45 @@ import 'package:flutter/material.dart';
 // Inside pos_dashboard_screen.dart
 import '../wholesale_inquiry_bottom_sheet.dart';
 import 'admin_dashboard_modal.dart';
+import 'app_update_helper.dart';
 import 'dashboard_view.dart';
 import 'left_pane_widget.dart'; // Import it
 import 'package:url_launcher/url_launcher.dart'; // 🟢 Added url_launcher
 
-class PosDashboardScreen extends StatelessWidget {
+// 🟢 Converted to StatefulWidget so we can trigger the update check on load
+class PosDashboardScreen extends StatefulWidget {
   const PosDashboardScreen({super.key});
+
+  @override
+  State<PosDashboardScreen> createState() => _PosDashboardScreenState();
+}
+
+class _PosDashboardScreenState extends State<PosDashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 🟢 Triggers the isolated App Update check seamlessly after the UI renders!
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppUpdateHelper.checkAppUpdate(context);
+    });
+  }
 
   // 🟢 Helper function to launch the WebView
   void _openAdminDashboard(BuildContext context) {
     const String adminMobile = "9974882009";
     const String adminPassword = "vraj@123";
     // Point this one to the main dashboard / orderList
-    final String targetUrl = 'https://retail-counter.bilipatra.com/login?username=$adminMobile&password=$adminPassword&redirect=/admin/orderList';
+    final String targetUrl =
+        'https://retail-counter.bilipatra.com/login?username=$adminMobile&password=$adminPassword&redirect=/admin/orderList';
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AdminDashboardModal(
-        url: targetUrl,
-        title: "Admin Dashboard", // Title for the main dashboard
-      ),
+      builder:
+          (context) => AdminDashboardModal(
+            url: targetUrl,
+            title: "Admin Dashboard", // Title for the main dashboard
+          ),
     );
   }
 
@@ -35,91 +53,118 @@ class PosDashboardScreen extends StatelessWidget {
   void _showStaticQR(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Container(
-          width: 400,
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+      builder:
+          (context) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Container(
+              width: 400,
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.verified_user, color: Colors.green, size: 28),
-                  SizedBox(width: 10),
-                  Text(
-                    "Store UPI QR",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.verified_user, color: Colors.green, size: 28),
+                      SizedBox(width: 10),
+                      Text(
+                        "Store UPI QR",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Scan to pay directly via PhonePe, GPay, or Paytm.",
-                style: TextStyle(color: Colors.black54, fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Scan to pay directly via PhonePe, GPay, or Paytm.",
+                    style: TextStyle(color: Colors.black54, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
 
-              // 🟢 The Static S3 Image
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade300, width: 2),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Image.network(
-                    'https://b12green-food.s3.ap-south-1.amazonaws.com/development/StaticQRcode.jpeg',
-                    width: 300,
-                    height: 300,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return const SizedBox(
+                  // 🟢 The Static S3 Image
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade300, width: 2),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.network(
+                        'https://b12green-food.s3.ap-south-1.amazonaws.com/development/StaticQRcode.jpeg',
                         width: 300,
                         height: 300,
-                        child: Center(child: CircularProgressIndicator(color: Colors.green)),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 300,
-                      height: 300,
-                      color: Colors.grey.shade100,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.broken_image, size: 50, color: Colors.grey.shade400),
-                          const SizedBox(height: 8),
-                          const Text("Failed to load QR", style: TextStyle(color: Colors.grey)),
-                        ],
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const SizedBox(
+                            width: 300,
+                            height: 300,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.green,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder:
+                            (context, error, stackTrace) => Container(
+                              width: 300,
+                              height: 300,
+                              color: Colors.grey.shade100,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.broken_image,
+                                    size: 50,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    "Failed to load QR",
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
                       ),
                     ),
                   ),
-                ),
-              ),
 
-              const SizedBox(height: 32),
+                  const SizedBox(height: 32),
 
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black87,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black87,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                      label: const Text(
+                        "Close Screen",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                  label: const Text("Close Screen", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -151,21 +196,25 @@ class PosDashboardScreen extends StatelessWidget {
             onPressed: () {
               showDialog(
                 context: context,
-                builder: (context) => Dialog(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    // Wrap in a constrained box so it looks great on tablets
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.85,
-                        maxHeight: MediaQuery.of(context).size.height * 0.85,
+                builder:
+                    (context) => Dialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      // 🟢 Call your new Dashboard View here!
-                      child: const DashboardView(),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        // Wrap in a constrained box so it looks great on tablets
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.85,
+                            maxHeight:
+                                MediaQuery.of(context).size.height * 0.85,
+                          ),
+                          // 🟢 Call your new Dashboard View here!
+                          child: const DashboardView(),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
               );
             },
             icon: Icon(Icons.analytics, color: Colors.purple.shade700),
@@ -198,12 +247,8 @@ class PosDashboardScreen extends StatelessWidget {
               // Push the Live QR page over the current screen
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const PaymentQRPage(),
-                ),
+                MaterialPageRoute(builder: (context) => const PaymentQRPage()),
               );
-              // Note: If you strictly use GoRouter, replace the Navigator.push with:
-              // context.push('/paymentQR'); (or whatever your route name is)
             },
             icon: Icon(Icons.cast_connected, color: Colors.orange.shade700),
             label: Text(
@@ -280,10 +325,7 @@ class PosDashboardScreen extends StatelessWidget {
           // ==========================================
           // LEFT PANE (60%) - Product Discovery & Grid
           // ==========================================
-          Expanded(
-            flex: 6,
-            child: const LeftPaneWidget(), // <-- Replaced the placeholder
-          ),
+          Expanded(flex: 6, child: const LeftPaneWidget()),
 
           // Divider between the panes
           const VerticalDivider(width: 1, thickness: 1, color: Colors.black12),
@@ -291,10 +333,7 @@ class PosDashboardScreen extends StatelessWidget {
           // ==========================================
           // RIGHT PANE (40%) - Customer, Cart & Checkout
           // ==========================================
-          Expanded(
-            flex: 4,
-            child: const RightPaneWidget(), // <-- Replaced the placeholder
-          ),
+          Expanded(flex: 4, child: const RightPaneWidget()),
         ],
       ),
     );
