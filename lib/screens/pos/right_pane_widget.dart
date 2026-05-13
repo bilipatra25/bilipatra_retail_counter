@@ -379,16 +379,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
 
                   if (mounted) {
                     Navigator.pop(dialogContext);
-                    // ScaffoldMessenger.of(context).showSnackBar(
-                    //   SnackBar(
-                    //     content: Text(
-                    //       isExisting
-                    //           ? "✅ Customer details confirmed! (ID: $finalCustomerId)"
-                    //           : "✅ New Customer Registered! (ID: $finalCustomerId)",
-                    //     ),
-                    //     backgroundColor: Colors.green,
-                    //   ),
-                    // );
                   }
                 } else {
                   throw Exception(
@@ -479,17 +469,33 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                         const SizedBox(height: 20),
                       ],
 
+                      // 🟢 FIXED: Changed enabled: false to readOnly: true so the button works!
                       TextField(
                         controller: TextEditingController(text: mobile),
-                        enabled: false,
+                        readOnly: true,
                         decoration: InputDecoration(
                           labelText: "Mobile Number",
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.phone),
                           fillColor: Colors.grey.shade100,
                           filled: true,
+                          suffixIcon: IconButton(
+                            icon: const Icon(
+                              Icons.edit,
+                              color: Colors.blueGrey,
+                            ),
+                            tooltip: "Edit Number",
+                            onPressed: () {
+                              Navigator.pop(dialogContext); // Close dialog
+                              _mobileController.text =
+                                  mobile; // Ensure text stays
+                              _mobileFocusNode
+                                  .requestFocus(); // Pop open keyboard
+                            },
+                          ),
                         ),
                       ),
+
                       const SizedBox(height: 16),
                       TextField(
                         controller: nameController,
@@ -987,6 +993,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 textInputAction: TextInputAction.search,
                 // 🟢 NEW: Auto-Trigger exactly on 10th digit
                 onChanged: (val) {
+                  setState(() {});
                   if (val.length == 10) {
                     _mobileFocusNode
                         .unfocus(); // Drops the physical/virtual keyboard
