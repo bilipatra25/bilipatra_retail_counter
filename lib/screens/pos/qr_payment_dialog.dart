@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 🟢 REQUIRED FOR KEYBOARD FORMATTERS
+import 'package:flutter/services.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'checkout_service.dart';
 
@@ -10,6 +10,7 @@ class QRPaymentDialog extends StatefulWidget {
   final String qrImageUrl;
   final bool willPrint;
   final String? customerMobile;
+  final VoidCallback? onPrint; // 🟢 NEW: Callback to trigger background printing
 
   const QRPaymentDialog({
     super.key,
@@ -18,6 +19,7 @@ class QRPaymentDialog extends StatefulWidget {
     required this.qrImageUrl,
     this.willPrint = true,
     this.customerMobile,
+    this.onPrint, // 🟢 NEW
   });
 
   @override
@@ -30,13 +32,11 @@ class _QRPaymentDialogState extends State<QRPaymentDialog> {
   bool _isSendingWhatsapp = false;
   StreamSubscription<DatabaseEvent>? _orderSubscription;
 
-  // 🟢 NEW: Controller for the editable WhatsApp field
   late TextEditingController _whatsappController;
 
   @override
   void initState() {
     super.initState();
-    // 🟢 Pre-fill it if we have it, otherwise leave it blank for Walk-ins
     _whatsappController = TextEditingController(text: widget.customerMobile ?? '');
     _listenForPayment();
   }
@@ -51,13 +51,17 @@ class _QRPaymentDialogState extends State<QRPaymentDialog> {
         if (data['paid'] == true && !_paymentReceived) {
           if (mounted) {
             setState(() => _paymentReceived = true);
+
+            // 🟢 AUTO-PRINT TRIGGER: Fires immediately while dialog is still open
+            if (widget.willPrint && widget.onPrint != null) {
+              widget.onPrint!();
+            }
           }
         }
       }
     });
   }
 
-  // 🟢 NEW: Extracted WhatsApp sending logic
   Future<void> _sendWhatsappLink() async {
     final phone = _whatsappController.text.trim();
 
@@ -205,32 +209,45 @@ class _QRPaymentDialogState extends State<QRPaymentDialog> {
             // 🟢 DYNAMIC ACTION BUTTONS
             // ==========================================
             if (_paymentReceived)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.pop(context, 'paid'),
-                  icon: Icon(
-                      widget.willPrint ? Icons.print : Icons.check_circle_outline,
-                      color: Colors.white
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      // 🟢 Returns 'paid_no_print' so the POS knows NOT to print again
+                      onPressed: () => Navigator.pop(context, 'paid_no_print'),
+                      icon: const Icon(Icons.close, color: Colors.black87),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        side: BorderSide(color: Colors.grey.shade400, width: 2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      label: const Text("Close", style: TextStyle(fontSize: 16, color: Colors.black87, fontWeight: FontWeight.bold)),
+                    ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade700,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      // 🟢 Returns 'paid_print' so the POS knows to explicitly print
+                      onPressed: () => Navigator.pop(context, 'paid_print'),
+                      icon: const Icon(Icons.print, color: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      label: Text(
+                        widget.willPrint ? "Print Again & Close" : "Print & Close",
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
-                  label: Text(
-                    widget.willPrint ? "Complete & Print Receipt" : "Complete Transaction",
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
+                ],
               )
             else
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-
-                  // 🟢 NEW: Editable WhatsApp Field (Visible for EVERYONE!)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -271,9 +288,7 @@ class _QRPaymentDialogState extends State<QRPaymentDialog> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 16),
-
                   Row(
                     children: [
                       Expanded(
@@ -291,7 +306,8 @@ class _QRPaymentDialogState extends State<QRPaymentDialog> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () => Navigator.pop(context, 'paid'),
+                          // 🟢 Returns 'paid_force' so the POS knows it was manually bypassed
+                          onPressed: () => Navigator.pop(context, 'paid_force'),
                           icon: const Icon(Icons.check_circle_outline, color: Colors.white),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blueAccent.shade700,

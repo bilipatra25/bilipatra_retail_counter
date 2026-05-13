@@ -1641,25 +1641,44 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       final qrImageUrl =
                                           responseData['image_url'];
                                       if (mounted) {
-                                        // 🟢 NEW: Capture the specific string result
-                                        final result =
-                                            await showDialog<dynamic>(
-                                              context: context,
-                                              barrierDismissible: false,
-                                              builder:
-                                                  (context) => QRPaymentDialog(
-                                                    orderId: orderId,
-                                                    amount: amountToAsk,
-                                                    qrImageUrl: qrImageUrl,
-                                                    willPrint: _printReceipt,
-                                                    customerMobile:
-                                                        appProvider
-                                                            .selectedCustomer
-                                                            ?.number,
-                                                  ),
-                                            );
+                                        final result = await showDialog<
+                                          dynamic
+                                        >(
+                                          context: context,
+                                          barrierDismissible: false,
+                                          builder:
+                                              (context) => QRPaymentDialog(
+                                                orderId: orderId,
+                                                amount: amountToAsk,
+                                                qrImageUrl: qrImageUrl,
+                                                willPrint: _printReceipt,
+                                                customerMobile:
+                                                    appProvider
+                                                        .selectedCustomer
+                                                        ?.number,
+                                                // 🟢 NEW: Passes the print function to the dialog to run in the background
+                                                onPrint: () {
+                                                  final orderIdToPrint =
+                                                      responseData['order_id'] ??
+                                                      appProvider
+                                                          .editingOrderId;
+                                                  if (orderIdToPrint != null) {
+                                                    _fetchAndPrintOrder(
+                                                      int.parse(
+                                                        orderIdToPrint
+                                                            .toString(),
+                                                      ),
+                                                    );
+                                                  }
+                                                },
+                                              ),
+                                        );
 
-                                        if (result == 'paid' ||
+                                        // 🟢 INTELLIGENT RESULT HANDLING
+                                        if (result == 'paid_no_print' ||
+                                            result == 'paid_print' ||
+                                            result == 'paid_force' ||
+                                            result == 'paid' ||
                                             result == true) {
                                           appProvider.clearCartAndCustomer();
                                           _mobileController.clear();
@@ -1667,13 +1686,27 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                           final orderIdToPrint =
                                               responseData['order_id'] ??
                                               appProvider.editingOrderId;
-                                          if (_printReceipt &&
-                                              orderIdToPrint != null) {
-                                            _fetchAndPrintOrder(
-                                              int.parse(
-                                                orderIdToPrint.toString(),
-                                              ),
-                                            );
+
+                                          if (orderIdToPrint != null) {
+                                            // If the cashier explicitly clicked "Print" on the dialog
+                                            if (result == 'paid_print') {
+                                              _fetchAndPrintOrder(
+                                                int.parse(
+                                                  orderIdToPrint.toString(),
+                                                ),
+                                              );
+                                            }
+                                            // If they forced it, print only if the print toggle was on
+                                            else if (result == 'paid_force' &&
+                                                _printReceipt) {
+                                              _fetchAndPrintOrder(
+                                                int.parse(
+                                                  orderIdToPrint.toString(),
+                                                ),
+                                              );
+                                            }
+                                            // ⚠️ Note: If result == 'paid_no_print', we purposefully do NOT print here
+                                            // because it already auto-printed in the background if the toggle was ON.
                                           }
 
                                           if (mounted) {
