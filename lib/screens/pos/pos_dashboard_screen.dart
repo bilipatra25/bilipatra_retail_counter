@@ -2,15 +2,14 @@ import 'package:bilipatra_retail_counter/screens/pos/payment_qr_page.dart';
 import 'package:bilipatra_retail_counter/screens/pos/recent_bills_modal.dart';
 import 'package:bilipatra_retail_counter/screens/pos/right_pane_widget.dart';
 import 'package:flutter/material.dart';
-// Inside pos_dashboard_screen.dart
+import 'package:package_info_plus/package_info_plus.dart'; // 🟢 Added this import
 import '../wholesale_inquiry_bottom_sheet.dart';
 import 'admin_dashboard_modal.dart';
 import 'app_update_helper.dart';
 import 'dashboard_view.dart';
-import 'left_pane_widget.dart'; // Import it
-import 'package:url_launcher/url_launcher.dart'; // 🟢 Added url_launcher
+import 'left_pane_widget.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-// 🟢 Converted to StatefulWidget so we can trigger the update check on load
 class PosDashboardScreen extends StatefulWidget {
   const PosDashboardScreen({super.key});
 
@@ -19,13 +18,26 @@ class PosDashboardScreen extends StatefulWidget {
 }
 
 class _PosDashboardScreenState extends State<PosDashboardScreen> {
+  String _currentVersion = ""; // 🟢 Variable to hold the version
+
   @override
   void initState() {
     super.initState();
-    // 🟢 Triggers the isolated App Update check seamlessly after the UI renders!
+    _loadAppVersion(); // 🟢 Fetch version on load
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppUpdateHelper.checkAppUpdate(context);
     });
+  }
+
+  // 🟢 Helper to get version from platform
+  Future<void> _loadAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _currentVersion = info.version;
+      });
+    }
   }
 
   // 🟢 Helper function to launch the WebView
@@ -176,17 +188,53 @@ class _PosDashboardScreenState extends State<PosDashboardScreen> {
         backgroundColor: Colors.white,
         elevation: 1,
         title: Row(
+          crossAxisAlignment:
+              CrossAxisAlignment.center, // Centers the image with the text
           children: [
-            // Replace with your actual logo asset
-            const Icon(Icons.storefront, color: Colors.green, size: 28),
-            const SizedBox(width: 10),
-            const Text(
-              "Bilipatra Retail POS",
-              style: TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
+            // 🟢 FIXED: Replaced Storefront Icon with Bilipatra Logo
+            ClipRRect(
+              borderRadius: BorderRadius.circular(
+                6,
+              ), // Optional: rounds the logo corners slightly
+              child: Image.asset(
+                'assets/logo.png',
+                height: 32,
+                width: 32,
+                fit: BoxFit.fitWidth,
+                errorBuilder:
+                    (context, error, stackTrace) => const Icon(
+                      Icons.storefront,
+                      color: Colors.green,
+                      size: 28,
+                    ), // Fallback just in case
               ),
+            ),
+            const SizedBox(width: 6),
+
+            // 🟢 FIXED: Nested Row specifically for perfect baseline text alignment
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                const Text(
+                  "Bilipatra Retail POS",
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // DISPLAY VERSION HERE
+                Text(
+                  "v$_currentVersion",
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
