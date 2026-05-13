@@ -6,8 +6,8 @@ import '../models/product.dart';
 class AppProvider with ChangeNotifier {
   // --- Customer State ---
   UserModel? _selectedCustomer;
-  final int defaultWalkInId = 1; //Testing
-  // final int defaultWalkInId = 0; // Walk In User
+  // final int defaultWalkInId = 1; //Testing
+  final int defaultWalkInId = 0; // Walk In User
   UserModel? get selectedCustomer => _selectedCustomer;
   int get activeCustomerId => _selectedCustomer?.id ?? defaultWalkInId;
 
