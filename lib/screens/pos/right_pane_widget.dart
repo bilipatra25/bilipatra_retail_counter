@@ -1028,6 +1028,8 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                     _mobileController.clear();
                                     appProvider.clearCustomer();
                                     _mobileFocusNode.requestFocus();
+
+                                    setState(() {});
                                   },
                                 ),
                               IconButton(
