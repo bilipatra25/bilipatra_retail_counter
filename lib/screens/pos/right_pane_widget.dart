@@ -630,11 +630,16 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   selectedBase,
                 );
               } else {
-                provider.applyCartDiscount(
-                  val > 0 ? selectedType : DiscountType.none,
-                  val,
-                  selectedBase,
-                );
+                // 🟢 Only apply manual if the switch is OFF.
+                // If Switch is ON, auto-calculations are already in effect.
+                if (provider.isGlobalDiscountManual) {
+                  provider.applyCartDiscount(
+                    val > 0 ? selectedType : DiscountType.none,
+                    val,
+                    selectedBase,
+                    isManual: true,
+                  );
+                }
               }
               Navigator.pop(context);
             }
@@ -735,9 +740,66 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (specificItem == null)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Automatic Qty Discount",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Text(
+                                    provider.isGlobalDiscountManual
+                                        ? "Currently: MANUAL OVERRIDE"
+                                        : "Currently: AUTO CALCULATING",
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color:
+                                          provider.isGlobalDiscountManual
+                                              ? Colors.orange.shade800
+                                              : Colors.green.shade800,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Switch(
+                                value: !provider.isGlobalDiscountManual,
+                                activeColor: Colors.green,
+                                onChanged: (val) {
+                                  setDialogState(() {
+                                    provider.applyCartDiscount(
+                                      DiscountType.none,
+                                      0,
+                                      provider.globalDiscountBase,
+                                      isManual: !val,
+                                    );
+                                    if (val) {
+                                      discountController.text = provider
+                                          .globalDiscountValue
+                                          .toStringAsFixed(0);
+                                    } else {
+                                      discountController.clear();
+                                    }
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        if (specificItem == null) const Divider(height: 24),
+
                         // 1. 🟢 Standard Material TextField (Restored!)
                         TextField(
                           controller: discountController,
+                          readOnly:
+                              specificItem == null &&
+                              !provider.isGlobalDiscountManual,
                           focusNode: inputFocus..requestFocus(),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
@@ -758,83 +820,125 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             filled: true,
-                            fillColor: Colors.blue.shade50,
+                            fillColor:
+                                (specificItem == null &&
+                                        !provider.isGlobalDiscountManual)
+                                    ? Colors.grey.shade200
+                                    : Colors.blue.shade50,
                           ),
                         ),
 
                         const SizedBox(height: 24),
 
                         // 2. 🟢 Discount Type Toggles
-                        const Text(
-                          "DISCOUNT TYPE",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                            letterSpacing: 1.2,
+                        AbsorbPointer(
+                          absorbing:
+                              specificItem == null &&
+                              !provider.isGlobalDiscountManual,
+                          child: Opacity(
+                            opacity:
+                                (specificItem == null &&
+                                        !provider.isGlobalDiscountManual)
+                                    ? 0.5
+                                    : 1.0,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "DISCOUNT TYPE",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    buildToggleButton(
+                                      "Percentage (%)",
+                                      selectedType == DiscountType.percent,
+                                      () {
+                                        setDialogState(
+                                          () =>
+                                              selectedType =
+                                                  DiscountType.percent,
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 12),
+                                    buildToggleButton(
+                                      "Flat Amount (₹)",
+                                      selectedType == DiscountType.flat,
+                                      () {
+                                        setDialogState(
+                                          () =>
+                                              selectedType = DiscountType.flat,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            buildToggleButton(
-                              "Percentage (%)",
-                              selectedType == DiscountType.percent,
-                              () {
-                                setDialogState(
-                                  () => selectedType = DiscountType.percent,
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 12),
-                            buildToggleButton(
-                              "Flat Amount (₹)",
-                              selectedType == DiscountType.flat,
-                              () {
-                                setDialogState(
-                                  () => selectedType = DiscountType.flat,
-                                );
-                              },
-                            ),
-                          ],
                         ),
 
                         const SizedBox(height: 24),
 
                         // 3. 🟢 Calculate From Toggles
-                        const Text(
-                          "CALCULATE FROM",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                            letterSpacing: 1.2,
+                        AbsorbPointer(
+                          absorbing:
+                              specificItem == null &&
+                              !provider.isGlobalDiscountManual,
+                          child: Opacity(
+                            opacity:
+                                (specificItem == null &&
+                                        !provider.isGlobalDiscountManual)
+                                    ? 0.5
+                                    : 1.0,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "CALCULATE FROM",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    buildToggleButton(
+                                      "Selling Price",
+                                      selectedBase == DiscountBase.sellingPrice,
+                                      () {
+                                        setDialogState(
+                                          () =>
+                                              selectedBase =
+                                                  DiscountBase.sellingPrice,
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 12),
+                                    buildToggleButton(
+                                      "MRP",
+                                      selectedBase == DiscountBase.mrp,
+                                      () {
+                                        setDialogState(
+                                          () => selectedBase = DiscountBase.mrp,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            buildToggleButton(
-                              "Selling Price",
-                              selectedBase == DiscountBase.sellingPrice,
-                              () {
-                                setDialogState(
-                                  () =>
-                                      selectedBase = DiscountBase.sellingPrice,
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 12),
-                            buildToggleButton(
-                              "MRP",
-                              selectedBase == DiscountBase.mrp,
-                              () {
-                                setDialogState(
-                                  () => selectedBase = DiscountBase.mrp,
-                                );
-                              },
-                            ),
-                          ],
                         ),
                       ],
                     ),
@@ -842,6 +946,19 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 ),
               ),
               actions: [
+                // 1. 🟢 CANCEL/CLOSE BUTTON
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                // 2. 🟢 CLEAR / REMOVE (Manual 0%)
                 TextButton(
                   onPressed: () {
                     if (specificItem != null) {
@@ -852,29 +969,34 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                         DiscountBase.sellingPrice,
                       );
                     } else {
+                      // Forces 0% and STOPS auto-qty logic
                       provider.applyCartDiscount(
                         DiscountType.none,
                         0,
                         DiscountBase.sellingPrice,
+                        isManual: true,
                       );
                     }
                     Navigator.pop(context);
                   },
-                  child: const Text(
-                    'Clear / Remove',
-                    style: TextStyle(
+                  child: Text(
+                    specificItem != null
+                        ? 'Remove Override'
+                        : 'Remove All Discounts',
+                    style: const TextStyle(
                       color: Colors.red,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
+
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade700,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 14,
+                      horizontal: 24,
+                      vertical: 12,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -882,7 +1004,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   ),
                   onPressed: applyDiscount,
                   child: const Text(
-                    'Apply Discount',
+                    'Apply',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -1138,11 +1260,14 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                   ? 0
                                   : 1,
                             );
+
+                        final suffix =
+                            appProvider.isGlobalDiscountManual ? "Global" : "Qty";
                         discountDetails =
                             appProvider.globalDiscountType ==
                                     DiscountType.percent
-                                ? "($valStr% Global)"
-                                : "(₹$valStr Global)";
+                                ? "($valStr% $suffix)"
+                                : "(₹$valStr $suffix)";
                       }
 
                       return ListTile(
@@ -1252,38 +1377,157 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    InkWell(
-                      onTap:
-                          () => _showDiscountDialog(
-                            provider: appProvider,
-                            specificItem: null,
-                          ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.style,
-                            color:
-                                appProvider.globalDiscountValue > 0
-                                    ? Colors.green
-                                    : Colors.blueGrey,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            appProvider.globalDiscountValue > 0
-                                ? "Global Discount Active"
-                                : "Add Global Discount",
-                            style: TextStyle(
-                              color:
-                                  appProvider.globalDiscountValue > 0
-                                      ? Colors.green
-                                      : Colors.blueGrey,
-                              fontSize: 13,
-                              decoration: TextDecoration.underline,
+                    Row(
+                      children: [
+                        if (appProvider.globalDiscountValue > 0)
+                          GestureDetector(
+                            onTap:
+                                () => _showDiscountDialog(
+                                  provider: appProvider,
+                                  specificItem: null,
+                                ),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    appProvider.isGlobalDiscountManual
+                                        ? Colors.orange.shade100
+                                        : Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color:
+                                      appProvider.isGlobalDiscountManual
+                                          ? Colors.orange.shade300
+                                          : Colors.green.shade300,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.stars,
+                                    size: 14,
+                                    color:
+                                        appProvider.isGlobalDiscountManual
+                                            ? Colors.orange.shade800
+                                            : Colors.green.shade800,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    appProvider.isGlobalDiscountManual
+                                        ? "GLOBAL ${appProvider.globalDiscountType == DiscountType.percent ? '${appProvider.globalDiscountValue.toStringAsFixed(0)}%' : '₹${appProvider.globalDiscountValue.toStringAsFixed(0)}'}"
+                                        : "AUTO QTY ${appProvider.globalDiscountValue.toStringAsFixed(0)}%",
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          appProvider.isGlobalDiscountManual
+                                              ? Colors.orange.shade900
+                                              : Colors.green.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          InkWell(
+                            onTap:
+                                () => _showDiscountDialog(
+                                  provider: appProvider,
+                                  specificItem: null,
+                                ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.style,
+                                  color: Colors.blueGrey,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  "Add Global Discount",
+                                  style: TextStyle(
+                                    color: Colors.blueGrey,
+                                    fontSize: 13,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+
+                        if (appProvider.isGlobalDiscountManual)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: SizedBox(
+                              height: 24,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  appProvider.applyCartDiscount(
+                                    DiscountType.none,
+                                    0,
+                                    DiscountBase.sellingPrice,
+                                    isManual: false,
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                child: const Text("RESET TO AUTO"),
+                              ),
+                            ),
+                          ),
+
+                        if (appProvider.globalDiscountValue > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: SizedBox(
+                              height: 24,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  appProvider.applyCartDiscount(
+                                    DiscountType.none,
+                                    0,
+                                    DiscountBase.sellingPrice,
+                                    isManual: true,
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red.shade600,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                child: const Text("CLEAR"),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     Text(
                       "Gross: ₹${appProvider.cartSubtotal.toStringAsFixed(0)}",

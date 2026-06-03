@@ -34,10 +34,12 @@ class AppProvider with ChangeNotifier {
   DiscountType _globalDiscountType = DiscountType.none;
   double _globalDiscountValue = 0.0;
   DiscountBase _globalDiscountBase = DiscountBase.sellingPrice;
+  bool _isGlobalDiscountManual = false;
 
   DiscountType get globalDiscountType => _globalDiscountType;
   double get globalDiscountValue => _globalDiscountValue;
   DiscountBase get globalDiscountBase => _globalDiscountBase;
+  bool get isGlobalDiscountManual => _isGlobalDiscountManual;
 
   // --- Methods ---
   void addProduct(ProductModel product) {
@@ -49,6 +51,7 @@ class AppProvider with ChangeNotifier {
     } else {
       _cart.add(CartItem(product: product));
     }
+    _updateAutoGlobalDiscount();
     notifyListeners();
   }
 
@@ -62,6 +65,7 @@ class AppProvider with ChangeNotifier {
       } else {
         _cart.removeAt(existingIndex);
       }
+      _updateAutoGlobalDiscount();
       notifyListeners();
     }
   }
@@ -79,11 +83,13 @@ class AppProvider with ChangeNotifier {
     } else {
       _cart.add(CartItem(product: product, quantity: quantity));
     }
+    _updateAutoGlobalDiscount();
     notifyListeners();
   }
 
   void removeCartItem(ProductModel product) {
     _cart.removeWhere((item) => item.product.id == product.id);
+    _updateAutoGlobalDiscount();
     notifyListeners();
   }
 
@@ -108,27 +114,49 @@ class AppProvider with ChangeNotifier {
   }
 
   // 🟢 Cart-Level Distribution Logic
-  void applyCartDiscount(DiscountType type, double value, DiscountBase base) {
+  void applyCartDiscount(DiscountType type, double value, DiscountBase base,
+      {bool isManual = true}) {
+    _isGlobalDiscountManual = isManual;
     _globalDiscountType = type;
     _globalDiscountValue = value;
     _globalDiscountBase = base;
 
-    // Optional: If you apply a global cart discount, do you want to wipe out existing item overrides?
-    // Uncomment the next 3 lines if YES. Leave commented if NO.
-    // for (var item in _cart) {
-    //   item.hasCustomDiscount = false;
-    // }
+    if (!_isGlobalDiscountManual) {
+      _updateAutoGlobalDiscount();
+    }
 
     notifyListeners();
   }
 
   // --- Dynamic Math Calculations ---
 
+  // 🟢 NEW: Auto Qty Discount Logic (Now sets Global)
+  void _updateAutoGlobalDiscount() {
+    if (_isGlobalDiscountManual) return;
+
+    int totalQty = totalItems;
+    double percent = 0.0;
+    if (totalQty >= 6)
+      percent = 25.0;
+    else if (totalQty >= 4)
+      percent = 20.0; // Covers 4 and 5
+    else if (totalQty >= 3)
+      percent = 15.0;
+    else if (totalQty >= 2)
+      percent = 10.0;
+    else if (totalQty >= 1) percent = 5.0;
+
+    _globalDiscountType = percent > 0 ? DiscountType.percent : DiscountType.none;
+    _globalDiscountValue = percent;
+    _globalDiscountBase = DiscountBase.sellingPrice;
+  }
+
   // Gets the exact discount for a specific item, respecting overrides
-  // 🟢 UPDATED: Calculates the exact discount by stacking Item & Global discounts!
-  // 🟢 UPDATED: Isolated Discount Logic
   double getItemCalculatedDiscount(CartItem item) {
-    double baseAmount = item.discountBase == DiscountBase.mrp ? item.totalMrp : item.totalSellingPrice;
+    double baseAmount =
+        item.discountBase == DiscountBase.mrp
+            ? item.totalMrp
+            : item.totalSellingPrice;
 
     // 1. ISOLATED OVERRIDE: If the item has a custom discount, it ONLY gets this.
     if (item.hasCustomDiscount) {
@@ -139,16 +167,18 @@ class AppProvider with ChangeNotifier {
       );
     }
 
-    // 2. GLOBAL ONLY: If no override, apply the global cart discount.
+    // 2. GLOBAL ONLY: apply the global cart discount (which might be auto-calculated).
     if (_globalDiscountValue > 0) {
       if (_globalDiscountType == DiscountType.percent) {
         return (baseAmount * _globalDiscountValue) / 100;
       } else if (_globalDiscountType == DiscountType.flat) {
-
         // Find the total value of ONLY the items that are eligible for the global discount
         double cartEligibleTotal = _cart.fold(0.0, (sum, cartItem) {
           if (cartItem.hasCustomDiscount) return sum; // Skip overridden items!
-          return sum + (cartItem.discountBase == DiscountBase.mrp ? cartItem.totalMrp : cartItem.totalSellingPrice);
+          return sum +
+              (cartItem.discountBase == DiscountBase.mrp
+                  ? cartItem.totalMrp
+                  : cartItem.totalSellingPrice);
         });
 
         // Distribute the flat global discount proportionally
@@ -194,6 +224,7 @@ class AppProvider with ChangeNotifier {
     _cart.clear();
     _globalDiscountType = globalDiscountType;
     _globalDiscountValue = globalDiscountValue;
+    _isGlobalDiscountManual = true; // Loaded orders should not auto-adjust
     _editingOrderId = orderId;
     _selectedCustomer = customer;
 
@@ -210,6 +241,7 @@ class AppProvider with ChangeNotifier {
     _selectedCustomer = null;
     _globalDiscountType = DiscountType.none;
     _globalDiscountValue = 0.0;
+    _isGlobalDiscountManual = false;
     _editingOrderId = null;
     _previouslyPaidAmount = 0.0; // Reset
     notifyListeners();
