@@ -114,8 +114,12 @@ class AppProvider with ChangeNotifier {
   }
 
   // 🟢 Cart-Level Distribution Logic
-  void applyCartDiscount(DiscountType type, double value, DiscountBase base,
-      {bool isManual = true}) {
+  void applyCartDiscount(
+    DiscountType type,
+    double value,
+    DiscountBase base, {
+    bool isManual = true,
+  }) {
     _isGlobalDiscountManual = isManual;
     _globalDiscountType = type;
     _globalDiscountValue = value;
@@ -130,23 +134,53 @@ class AppProvider with ChangeNotifier {
 
   // --- Dynamic Math Calculations ---
 
+  // 🟢 NEW: Check if item is eligible for auto-qty discount (>= 200g)
+  bool _isEligibleForAutoDiscount(CartItem item) {
+    return true;
+
+    //Special product exception
+    /*if (item.product.name.contains('Diabo')) {
+      return true;
+    }*/
+
+    String weightStr = item.product.weight.toLowerCase();
+    double value = 0;
+
+    // Extract numeric part
+    RegExp regExp = RegExp(r'(\d+\.?\d*)');
+    var match = regExp.firstMatch(weightStr);
+    if (match != null) {
+      value = double.tryParse(match.group(1)!) ?? 0;
+    }
+
+    if (weightStr.contains('kg')) {
+      value *= 1000;
+    }
+
+    return value >= 200;
+  }
+
   // 🟢 NEW: Auto Qty Discount Logic (Now sets Global)
   void _updateAutoGlobalDiscount() {
     if (_isGlobalDiscountManual) return;
 
-    int totalQty = totalItems;
-    double percent = 0.0;
-    if (totalQty >= 6)
-      percent = 25.0;
-    else if (totalQty >= 4)
-      percent = 20.0; // Covers 4 and 5
-    else if (totalQty >= 3)
-      percent = 15.0;
-    else if (totalQty >= 2)
-      percent = 10.0;
-    else if (totalQty >= 1) percent = 5.0;
+    // Only count products with weight >= 200g
+    int eligibleQty = _cart.fold(0, (sum, item) {
+      return sum + (_isEligibleForAutoDiscount(item) ? item.quantity : 0);
+    });
 
-    _globalDiscountType = percent > 0 ? DiscountType.percent : DiscountType.none;
+    double percent = 0.0;
+    if (eligibleQty >= 6)
+      percent = 25.0;
+    else if (eligibleQty >= 3)
+      percent = 20.0;
+    else if (eligibleQty >= 2)
+      percent = 15.0;
+    else if (eligibleQty >= 1)
+      percent = 10.0;
+
+    _globalDiscountType =
+        percent > 0 ? DiscountType.percent : DiscountType.none;
     _globalDiscountValue = percent;
     _globalDiscountBase = DiscountBase.sellingPrice;
   }
@@ -167,14 +201,23 @@ class AppProvider with ChangeNotifier {
       );
     }
 
-    // 2. GLOBAL ONLY: apply the global cart discount (which might be auto-calculated).
+    // 2. GLOBAL DISCOUNT
     if (_globalDiscountValue > 0) {
+      // 🟢 SPECIAL CASE: If in Auto Mode, only apply to >= 200g items
+      if (!_isGlobalDiscountManual && !_isEligibleForAutoDiscount(item)) {
+        return 0.0;
+      }
+
       if (_globalDiscountType == DiscountType.percent) {
         return (baseAmount * _globalDiscountValue) / 100;
       } else if (_globalDiscountType == DiscountType.flat) {
         // Find the total value of ONLY the items that are eligible for the global discount
         double cartEligibleTotal = _cart.fold(0.0, (sum, cartItem) {
           if (cartItem.hasCustomDiscount) return sum; // Skip overridden items!
+          // In Auto Mode, also skip small items for flat distribution (though auto is usually percent)
+          if (!_isGlobalDiscountManual && !_isEligibleForAutoDiscount(cartItem))
+            return sum;
+
           return sum +
               (cartItem.discountBase == DiscountBase.mrp
                   ? cartItem.totalMrp
@@ -213,14 +256,15 @@ class AppProvider with ChangeNotifier {
   // If positive, customer owes us. If negative, we owe customer a refund.
   double get balanceDue => cartFinalTotal - _previouslyPaidAmount;
 
-
   // 🟢 UPDATED: Now accepts the previouslyPaid parameter
   void loadExistingOrder(
-      int orderId,
-      UserModel customer,
-      List<CartItem> previousItems,
-      {DiscountType globalDiscountType = DiscountType.none, double globalDiscountValue = 0.0, double previouslyPaid = 0.0}
-      ) {
+    int orderId,
+    UserModel customer,
+    List<CartItem> previousItems, {
+    DiscountType globalDiscountType = DiscountType.none,
+    double globalDiscountValue = 0.0,
+    double previouslyPaid = 0.0,
+  }) {
     _cart.clear();
     _globalDiscountType = globalDiscountType;
     _globalDiscountValue = globalDiscountValue;
