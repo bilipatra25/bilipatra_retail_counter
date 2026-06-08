@@ -453,11 +453,22 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> orderList(int page, int limit) async {
-    return await _postRequest("retailcounter_order/v1/orderlist", {
-      'page': page, 'limit': limit, // 'from_date': from_date,
-      // 'to_date': to_date,
-    });
+  Future<Map<String, dynamic>> orderList(
+    int page,
+    int limit, {
+    String orderType = 'ALL', // 🟢 NEW
+    bool hasDues = false, // 🟢 NEW
+  }) async {
+    final response = await _postRequest(
+      'retailcounter_order/v1/orderlist', // (તમારો જે સાચો રૂટ હોય તે જ રાખજો)
+      {
+        "page": page,
+        "limit": limit,
+        "order_type": orderType,
+        "has_dues": hasDues,
+      },
+    );
+    return response;
   }
 
   Future<Map<String, dynamic>> orderListById(String orderId) async {
@@ -525,6 +536,42 @@ class ApiService {
       'retailcounter_order/v1/send-payment-whatsapp',
       {"order_id": orderId, "mobile_no": mobileNo},
     );
+    return response;
+  }
+
+  // 🟢 1. Fetch Pending Bills
+  Future<Map<String, dynamic>> getCustomerPendingBills(int customerId) async {
+    final response = await http.get(
+      Uri.parse(
+        '$baseUrl/retailcounter_order/v1/pending-bills?customer_id=$customerId',
+      ),
+      headers: await _getHeaders(),
+    );
+
+    _logResponse(
+      '$baseUrl/retailcounter_order/v1/ pending-bills?customer_id=$customerId',
+      response,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load pending bills');
+    }
+  }
+
+  Future<Map<String, dynamic>> payPendingBill({
+    required int orderId,
+    required int customerId,
+    required double amount,
+    required String paymentMethod,
+  }) async {
+    final response = await _postRequest('retailcounter_order/v1/pay-bill', {
+      "order_id": orderId,
+      "customer_id": customerId,
+      "amount": amount,
+      "payment_method": paymentMethod, // 'cash' or 'online'
+    });
     return response;
   }
 }

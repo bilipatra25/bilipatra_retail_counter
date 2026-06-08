@@ -1,4 +1,5 @@
 import 'package:bilipatra_retail_counter/models/order_model.dart';
+import 'package:bilipatra_retail_counter/screens/pos/customer_dues_dialog.dart';
 import 'package:bilipatra_retail_counter/utils/PrinterHelper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,7 +44,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
       return;
     }
 
-    // 🟢 GUARD: Prevent double-firing if scanner sends 10 digits + Enter instantly
     if (_isLoadingCustomer) return;
 
     setState(() => _isLoadingCustomer = true);
@@ -180,20 +180,15 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
   }
 
   // ==========================================
-  // 🟢 CHECKOUT GUARDRAIL DIALOG
-  // ==========================================
-  // ==========================================
   // CHECKOUT GUARDRAIL DIALOG
   // ==========================================
   Future<bool> _promptCustomerBeforeCheckout(AppProvider provider) async {
-    // If a customer is already assigned (and isn't the default walk-in id), proceed instantly.
     if (provider.selectedCustomer != null &&
         provider.selectedCustomer!.number.isNotEmpty &&
         provider.selectedCustomer!.number != '0000000000') {
       return true;
     }
 
-    // If they typed 10 digits but didn't hit enter, fetch it now and abort this checkout attempt
     if (_mobileController.text.length == 10) {
       _fetchCustomer(_mobileController.text, provider);
       return false;
@@ -228,26 +223,23 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: tempMobile,
-                  focusNode:
-                      tempFocus
-                        ..requestFocus(), // Auto-focuses for physical keyboard
+                  focusNode: tempFocus..requestFocus(),
                   keyboardType: TextInputType.phone,
                   inputFormatters: [
                     LengthLimitingTextInputFormatter(10),
                     FilteringTextInputFormatter.digitsOnly,
                   ],
                   textInputAction: TextInputAction.done,
-                  // 🟢 NEW: Auto-Trigger exactly on 10th digit
                   onChanged: (val) {
                     if (val.length == 10) {
-                      Navigator.pop(ctx, true); // Instantly search this number
+                      Navigator.pop(ctx, true);
                     }
                   },
                   onSubmitted: (val) {
                     if (val.length == 10) {
-                      Navigator.pop(ctx, true); // Search this number
+                      Navigator.pop(ctx, true);
                     } else {
-                      Navigator.pop(ctx, false); // Skip
+                      Navigator.pop(ctx, false);
                     }
                   },
                   decoration: InputDecoration(
@@ -268,7 +260,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   style: TextStyle(color: Colors.red),
                 ),
               ),
-              // 🟢 UPDATED: Promoted to primary button since "Search" was removed
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blueGrey.shade600,
@@ -281,19 +272,212 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
           ),
     );
 
-    if (result == null) return false; // Cashier hit Cancel Checkout
-    if (result == false)
-      return true; // Cashier hit Skip, allow checkout to proceed
+    if (result == null) return false;
+    if (result == false) return true;
 
     if (result == true) {
-      // Cashier entered a number. Set it, fetch it, and abort the checkout
-      // so the registration dialog can cleanly pop up.
       _mobileController.text = tempMobile.text;
       _fetchCustomer(tempMobile.text, provider);
       return false;
     }
 
     return false;
+  }
+
+  // ==========================================
+  // 🟢 NEW: CREDIT ADVANCE PAYMENT DIALOG
+  // ==========================================
+  Future<Map<String, dynamic>?> _showCreditDialog(double grandTotal) async {
+    double advanceAmount = 0.0;
+    String method = 'cash';
+    final TextEditingController advanceCtrl = TextEditingController(text: "0");
+
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            double remaining = grandTotal - advanceAmount;
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.menu_book, color: Colors.orange.shade800),
+                  const SizedBox(width: 8),
+                  const Text("Pay Later / Credit"),
+                ],
+              ),
+              content: SizedBox(
+                width: 350,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Grand Total:",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            "₹${grandTotal.toStringAsFixed(2)}",
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Advance Payment Received (₹)",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: advanceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d+\.?\d{0,2}'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        setDialogState(() {
+                          advanceAmount = double.tryParse(val) ?? 0.0;
+                          if (advanceAmount > grandTotal) {
+                            advanceAmount = grandTotal;
+                            advanceCtrl.text = grandTotal.toStringAsFixed(2);
+                          }
+                        });
+                      },
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.currency_rupee),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                    if (advanceAmount > 0) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Advance Payment Method",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: const Text("Cash"),
+                              value: "cash",
+                              groupValue: method,
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              onChanged:
+                                  (val) => setDialogState(() => method = val!),
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: const Text("UPI"),
+                              value: "online",
+                              groupValue: method,
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              onChanged:
+                                  (val) => setDialogState(() => method = val!),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Remaining Credit:",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                          Text(
+                            "₹${remaining.toStringAsFixed(2)}",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, null),
+                  child: const Text(
+                    "Cancel",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.shade800,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx, {
+                      'amount': advanceAmount,
+                      'method': method,
+                    });
+                  },
+                  child: const Text("Confirm Credit Order"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   // ==========================================
@@ -469,8 +653,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                         ),
                         const SizedBox(height: 20),
                       ],
-
-                      // 🟢 FIXED: Changed enabled: false to readOnly: true so the button works!
                       TextField(
                         controller: TextEditingController(text: mobile),
                         readOnly: true,
@@ -488,15 +670,12 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                             tooltip: "Edit Number",
                             onPressed: () {
                               Navigator.pop(dialogContext); // Close dialog
-                              _mobileController.text =
-                                  mobile; // Ensure text stays
-                              _mobileFocusNode
-                                  .requestFocus(); // Pop open keyboard
+                              _mobileController.text = mobile;
+                              _mobileFocusNode.requestFocus();
                             },
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 16),
                       TextField(
                         controller: nameController,
@@ -582,9 +761,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
     );
   }
 
-  // ==========================================
-  // REUSABLE DISCOUNT DIALOG
-  // ==========================================
   void _showDiscountDialog({
     required AppProvider provider,
     CartItem? specificItem,
@@ -603,9 +779,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
 
     return Column(
       children: [
-        // ==========================================
-        // 🟢 COMPACT EDITING BANNER
-        // ==========================================
         if (appProvider.isEditingOrder)
           Container(
             width: double.infinity,
@@ -673,9 +846,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
             ),
           ),
 
-        // ==========================================
-        // 🟢 COMPACT CUSTOMER HEADER
-        // ==========================================
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -693,12 +863,10 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   FilteringTextInputFormatter.digitsOnly,
                 ],
                 textInputAction: TextInputAction.search,
-                // 🟢 NEW: Auto-Trigger exactly on 10th digit
                 onChanged: (val) {
                   setState(() {});
                   if (val.length == 10) {
-                    _mobileFocusNode
-                        .unfocus(); // Drops the physical/virtual keyboard
+                    _mobileFocusNode.unfocus();
                     _fetchCustomer(val, appProvider);
                   }
                 },
@@ -756,47 +924,82 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
               if (user != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.verified_user,
-                          color: Colors.green,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "${user.name} ${user.address.isNotEmpty ? '(${user.address})' : ''}",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8, // Thicker padding
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.verified_user,
+                                color: Colors.green,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  "${user.name} ${user.address.isNotEmpty ? '(${user.address})' : ''}",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                    fontSize: 14, // Slightly larger font
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 🟢 NEW: KHATA / DUES BUTTON
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder:
+                                (context) => CustomerDuesDialog(customer: user),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.account_balance_wallet,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          "Khata",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade50,
+                          foregroundColor: Colors.red.shade800,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: Colors.red.shade200),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
           ),
         ),
 
-        // ==========================================
-        // 2. ACTIVE CART LIST
-        // ==========================================
         Expanded(
           child:
               appProvider.cart.isEmpty
@@ -938,9 +1141,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                   ),
         ),
 
-        // ==========================================
-        // 🟢 COMPACT CHECKOUT FOOTER
-        // ==========================================
         if (appProvider.cart.isNotEmpty)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1313,7 +1513,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                           action == 'refund') {
                                         _showRefundAlert(context, delta.abs());
                                       } else if (action == 'collect') {
-                                        // 🟢 NEW: Triggers the mandatory acknowledgment dialog
                                         if (mounted) {
                                           _showCollectCashDialog(
                                             context,
@@ -1449,7 +1648,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       if (action == 'refund_online_auto') {
                                         showQrDialog = false;
                                         if (mounted) {
-                                          // 🟢 FIXED: Now uses the hard Dialog instead of SnackBar!
                                           _showAutoRefundSuccessDialog(
                                             context,
                                             delta.abs(),
@@ -1462,7 +1660,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                       } else if (action == 'none') {
                                         showQrDialog = false;
                                       } else if (action == 'collect') {
-                                        // 🟢 Correct for UPI: Opens the QR dialog for the extra amount
                                         amountToAsk = delta;
                                       }
                                     }
@@ -1491,7 +1688,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                                     appProvider
                                                         .selectedCustomer
                                                         ?.number,
-                                                // 🟢 NEW: Passes the print function to the dialog to run in the background
                                                 onPrint: () {
                                                   final orderIdToPrint =
                                                       responseData['order_id'] ??
@@ -1509,7 +1705,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                               ),
                                         );
 
-                                        // 🟢 INTELLIGENT RESULT HANDLING
                                         if (result == 'paid_no_print' ||
                                             result == 'paid_print' ||
                                             result == 'paid_force' ||
@@ -1523,16 +1718,13 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                               appProvider.editingOrderId;
 
                                           if (orderIdToPrint != null) {
-                                            // If the cashier explicitly clicked "Print" on the dialog
                                             if (result == 'paid_print') {
                                               _fetchAndPrintOrder(
                                                 int.parse(
                                                   orderIdToPrint.toString(),
                                                 ),
                                               );
-                                            }
-                                            // If they forced it, print only if the print toggle was on
-                                            else if (result == 'paid_force' &&
+                                            } else if (result == 'paid_force' &&
                                                 _printReceipt) {
                                               _fetchAndPrintOrder(
                                                 int.parse(
@@ -1540,8 +1732,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                                 ),
                                               );
                                             }
-                                            // ⚠️ Note: If result == 'paid_no_print', we purposefully do NOT print here
-                                            // because it already auto-printed in the background if the toggle was ON.
                                           }
 
                                           if (mounted) {
@@ -1593,7 +1783,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                         }
                                       }
                                     } else {
-                                      // If showQrDialog is false (because it was a refund or exact match)
                                       appProvider.clearCartAndCustomer();
                                       _mobileController.clear();
                                       if (mounted) {
@@ -1657,6 +1846,204 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
+
+                    // ==========================================
+                    // 🟢 NEW: PAY LATER / CREDIT BUTTON
+                    // ==========================================
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed:
+                            _isProcessingCheckout
+                                ? null
+                                : () async {
+                                  if (appProvider.cart.isEmpty) return;
+
+                                  // 1. MUST HAVE A REGISTERED CUSTOMER
+                                  if (appProvider.selectedCustomer == null ||
+                                      appProvider
+                                          .selectedCustomer!
+                                          .number
+                                          .isEmpty ||
+                                      appProvider.selectedCustomer!.number ==
+                                          '0000000000') {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          "⚠️ Please register/select a customer for Credit orders.",
+                                        ),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                    _mobileFocusNode.requestFocus();
+                                    return;
+                                  }
+
+                                  // 2. SHOW PARTIAL PAYMENT DIALOG
+                                  final creditData = await _showCreditDialog(
+                                    appProvider.cartFinalTotal,
+                                  );
+                                  if (creditData == null) return; // Cancelled
+
+                                  setState(() => _isProcessingCheckout = true);
+                                  try {
+                                    final responseData =
+                                        await CheckoutService.placeCreditOrder(
+                                          context,
+                                          appProvider,
+                                          creditData['amount'],
+                                          creditData['method'],
+                                        );
+
+                                    // 3. IF UPI ADVANCE > 0, SHOW QR DIALOG
+                                    if (creditData['method'] == 'online' &&
+                                        creditData['amount'] > 0) {
+                                      // 🔥 SAFE PARSING: Ensure orderId is explicitly an int
+                                      final int orderId =
+                                          int.tryParse(
+                                            responseData['order_id'].toString(),
+                                          ) ??
+                                          0;
+                                      final qrImageUrl =
+                                          responseData['image_url'];
+
+                                      if (mounted)
+                                        setState(
+                                          () => _isProcessingCheckout = false,
+                                        );
+
+                                      if (mounted && orderId > 0) {
+                                        // Safety check
+                                        final result = await showDialog<
+                                          dynamic
+                                        >(
+                                          context: context,
+                                          barrierDismissible: false,
+                                          builder:
+                                              (context) => QRPaymentDialog(
+                                                orderId:
+                                                    orderId, // 🔥 Passes clean INT
+                                                amount: creditData['amount'],
+                                                qrImageUrl: qrImageUrl,
+                                                willPrint: _printReceipt,
+                                                customerMobile:
+                                                    appProvider
+                                                        .selectedCustomer
+                                                        ?.number,
+                                                onPrint: () {
+                                                  _fetchAndPrintOrder(orderId);
+                                                },
+                                              ),
+                                        );
+
+                                        // Cleanup after QR flow
+                                        if (result == 'paid_no_print' ||
+                                            result == 'paid_print' ||
+                                            result == 'paid_force' ||
+                                            result == 'paid' ||
+                                            result == true) {
+                                          appProvider.clearCartAndCustomer();
+                                          _mobileController.clear();
+                                          if (result == 'paid_print') {
+                                            _fetchAndPrintOrder(orderId);
+                                          }
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  "✅ Credit Order Saved & UPI Advance Paid!",
+                                                ),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+                                          }
+                                        } else if (result == 'cancel_order') {
+                                          await ApiService(
+                                            context,
+                                          ).cancelOrder(orderId);
+                                          appProvider.clearCartAndCustomer();
+                                          _mobileController.clear();
+                                        }
+                                      }
+                                    }
+                                    // 4. CASH ADVANCE OR NO ADVANCE
+                                    else {
+                                      appProvider.clearCartAndCustomer();
+                                      _mobileController.clear();
+
+                                      final orderIdToPrint =
+                                          responseData['order_id'] ??
+                                          appProvider.editingOrderId;
+                                      if (_printReceipt &&
+                                          orderIdToPrint != null) {
+                                        _fetchAndPrintOrder(
+                                          int.parse(orderIdToPrint.toString()),
+                                        );
+                                      }
+
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              "✅ Credit Order Saved Successfully!",
+                                            ),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            "❌ Checkout Failed: $e",
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  } finally {
+                                    if (mounted)
+                                      setState(
+                                        () => _isProcessingCheckout = false,
+                                      );
+                                  }
+                                },
+                        icon:
+                            _isProcessingCheckout
+                                ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                : const Icon(Icons.menu_book, size: 20),
+                        label: Text(
+                          _isProcessingCheckout ? "WAIT..." : "PAY LATER",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          backgroundColor: Colors.orange.shade800,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -1701,11 +2088,10 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
     );
   }
 
-  // 🟢 NEW: Proper Dialog for Auto-Refunds (Replaces SnackBar)
   void _showAutoRefundSuccessDialog(BuildContext context, double amount) {
     showDialog(
       context: context,
-      barrierDismissible: false, // Force them to acknowledge it
+      barrierDismissible: false,
       builder:
           (context) => AlertDialog(
             shape: RoundedRectangleBorder(
@@ -1743,11 +2129,10 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
     );
   }
 
-  // 🟢 NEW: Proper Dialog for Collecting Extra Cash
   void _showCollectCashDialog(BuildContext context, double amount) {
     showDialog(
       context: context,
-      barrierDismissible: false, // Forces the cashier to acknowledge it
+      barrierDismissible: false,
       builder:
           (context) => AlertDialog(
             shape: RoundedRectangleBorder(
@@ -1785,7 +2170,6 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
     );
   }
 
-  // 🟢 NEW: Auto-Fetch & Print Function
   Future<void> _fetchAndPrintOrder(int orderId) async {
     try {
       final res = await ApiService(context).orderListById(orderId.toString());

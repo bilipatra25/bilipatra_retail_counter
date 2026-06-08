@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/api_service.dart';
@@ -6,8 +7,9 @@ import '../../providers/app_provider.dart';
 import '../../models/cart_item_model.dart';
 import '../../models/user.dart';
 import '../../models/product.dart';
-import '../../models/order_model.dart'; // 🟢 Added for printing
-import '../../utils/PrinterHelper.dart'; // 🟢 Added for printing
+import '../../models/order_model.dart';
+import '../../utils/PrinterHelper.dart';
+import 'qr_payment_dialog.dart';
 
 class RecentBillsModal extends StatefulWidget {
   const RecentBillsModal({super.key});
@@ -20,6 +22,10 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
   bool _isLoading = true;
   List<dynamic> _orders = [];
   String? _errorMessage;
+
+  // 🟢 NEW: Filter States
+  String _selectedOrderType = 'ALL';
+  bool _showOnlyDues = false;
 
   @override
   void initState() {
@@ -34,7 +40,10 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
     });
 
     try {
-      final response = await ApiService(context).orderList(1, 20);
+      // 🟢 NEW: Pass filters to API (Limit increased to 50 for better filtering experience)
+      final response = await ApiService(
+        context,
+      ).orderList(1, 50, orderType: _selectedOrderType, hasDues: _showOnlyDues);
 
       if (response['flag'] == 1 && response['code'] == 200) {
         setState(() {
@@ -80,27 +89,238 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
     }
   }
 
-  // 🟢 NEW: Print Order Function
-  Future<void> _printOrder(int orderId) async {
-    // ScaffoldMessenger.of(context).showSnackBar(
-    //   SnackBar(
-    //     content: Text("Fetching receipt #$orderId for printing..."),
-    //     duration: const Duration(seconds: 1),
-    //   ),
-    // );
+  void _showPaymentDialog(Map<String, dynamic> order, double balanceDue) {
+    final int orderId = int.tryParse(order['order_id']?.toString() ?? '0') ?? 0;
+    final int customerId =
+        int.tryParse(order['customer_id']?.toString() ?? '0') ?? 0;
+    final String mobile = order['order_mobile_no']?.toString() ?? '';
 
+    double payAmount = balanceDue;
+    String method = 'cash';
+    final TextEditingController amountCtrl = TextEditingController(
+      text: balanceDue.toStringAsFixed(0),
+    );
+    bool isProcessing = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text("Settle Pending Bill"),
+              content: SizedBox(
+                width: 350,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Order #$orderId  •  Total Bill: ₹${order['total_amount']}",
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Balance Due:",
+                            style: TextStyle(
+                              color: Colors.red.shade900,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            "₹${balanceDue.toStringAsFixed(2)}",
+                            style: TextStyle(
+                              color: Colors.red.shade900,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Paying Amount (₹)",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: amountCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d+\.?\d{0,2}'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        setModalState(() {
+                          payAmount = double.tryParse(val) ?? 0.0;
+                          if (payAmount > balanceDue) {
+                            payAmount = balanceDue;
+                            amountCtrl.text = balanceDue.toStringAsFixed(2);
+                          }
+                        });
+                      },
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.currency_rupee),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Payment Method",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text("Cash"),
+                            value: "cash",
+                            groupValue: method,
+                            onChanged:
+                                (val) => setModalState(() => method = val!),
+                          ),
+                        ),
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text("UPI"),
+                            value: "online",
+                            groupValue: method,
+                            onChanged:
+                                (val) => setModalState(() => method = val!),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isProcessing ? null : () => Navigator.pop(ctx),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed:
+                      isProcessing
+                          ? null
+                          : () async {
+                            if (payAmount <= 0) return;
+                            setModalState(() => isProcessing = true);
+                            try {
+                              final response = await ApiService(
+                                context,
+                              ).payPendingBill(
+                                orderId: orderId,
+                                customerId: customerId,
+                                amount: payAmount,
+                                paymentMethod: method,
+                              );
+
+                              Navigator.pop(ctx);
+
+                              if (method == 'online') {
+                                final qrImageUrl =
+                                    response['data']['image_url'];
+                                final result = await showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder:
+                                      (context) => QRPaymentDialog(
+                                        orderId: orderId,
+                                        amount: payAmount,
+                                        qrImageUrl: qrImageUrl,
+                                        willPrint: false,
+                                        customerMobile: mobile,
+                                      ),
+                                );
+                                if (result == 'paid_no_print' ||
+                                    result == 'paid_print' ||
+                                    result == 'paid_force' ||
+                                    result == 'paid' ||
+                                    result == true) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "✅ UPI Repayment Successful!",
+                                      ),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      "✅ Cash Repayment Successful!",
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+
+                              _fetchRecentOrders();
+                            } catch (e) {
+                              setModalState(() => isProcessing = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("❌ Failed: $e"),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                  child:
+                      isProcessing
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                          : const Text("Receive Payment"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _printOrder(int orderId) async {
     try {
       final res = await ApiService(context).orderListById(orderId.toString());
       if (res['flag'] == 1 && res['data'] != null) {
         OrderModelResponse order = OrderModelResponse.fromJson(res['data']);
         order.orderId = orderId.toString();
-
         await PrinterHelper.printInvoice(order);
       } else {
         throw Exception("Failed to load order details for printing");
       }
     } catch (e) {
-      debugPrint("Print failed: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -109,11 +329,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
             ),
             backgroundColor: Colors.orange.shade900,
             duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'DISMISS',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
           ),
         );
       }
@@ -138,7 +353,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
       if (response['flag'] == 1 && response['data'] != null) {
         final data = response['data'];
 
-        // 1. Reconstruct Customer
         final customerData = data['customer'] ?? {};
         final customer = UserModel(
           id: int.tryParse(customerData['id']?.toString() ?? '0') ?? 0,
@@ -147,7 +361,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
           address: customerData['address'] ?? '',
         );
 
-        // 2. Extract Global Discount from the Invoice object
         final invoiceData = data['invoice'] ?? {};
         final double previousGlobalDiscount =
             double.tryParse(
@@ -155,7 +368,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
             ) ??
             0.0;
 
-        // 3. Reconstruct the CartItems WITH their individual discounts
         final productList = data['product_list'] as List<dynamic>? ?? [];
         List<CartItem> cartItems = [];
 
@@ -181,7 +393,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
           final double itemDiscountPercent =
               double.tryParse(p['item_discount_percent']?.toString() ?? '0') ??
               0.0;
-
           CartItem newItem = CartItem(
             product: product,
             quantity: p['qty'] ?? 1,
@@ -193,7 +404,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
             newItem.discountValue = itemDiscountPercent;
             newItem.discountBase = DiscountBase.sellingPrice;
           }
-
           cartItems.add(newItem);
         }
 
@@ -202,7 +412,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
             double.tryParse(summaryData['paid_amount']?.toString() ?? '0') ??
             0.0;
 
-        // 4. Inject into Provider!
         if (mounted) {
           Provider.of<AppProvider>(context, listen: false).loadExistingOrder(
             orderId,
@@ -216,8 +425,8 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
             previouslyPaid: previouslyPaid,
           );
 
-          Navigator.pop(context); // Close loading dialog
-          Navigator.pop(context); // Close Recent Bills Modal
+          Navigator.pop(context);
+          Navigator.pop(context);
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -303,20 +512,41 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
     );
   }
 
+  // 🟢 Helper to build simple filter chips
+  Widget _buildFilterChip(String label) {
+    final isSelected = _selectedOrderType == label;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.black87,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
+      selected: isSelected,
+      selectedColor: Colors.blueGrey.shade700,
+      backgroundColor: Colors.grey.shade200,
+      onSelected: (bool selected) {
+        if (selected) {
+          setState(() => _selectedOrderType = label);
+          _fetchRecentOrders();
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        width: 850,
-        height: 650,
+        width: 900,
+        height: 700,
         padding: const EdgeInsets.all(0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ==========================================
-            // HEADER
-            // ==========================================
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               decoration: BoxDecoration(
@@ -325,7 +555,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
                 ),
-                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -369,9 +598,72 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
               ),
             ),
 
-            // ==========================================
-            // LIST AREA
-            // ==========================================
+            // 🟢 NEW: FILTERS BAR
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade200),
+                  top: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        "Filter: ",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('ALL'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('CASH'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('ONLINE'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('CREDIT'),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        "Pending Dues Only",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color:
+                              _showOnlyDues
+                                  ? Colors.orange.shade800
+                                  : Colors.grey,
+                        ),
+                      ),
+                      Switch(
+                        value: _showOnlyDues,
+                        activeColor: Colors.orange.shade700,
+                        onChanged: (val) {
+                          setState(() {
+                            _showOnlyDues = val;
+                            // If toggled ON, force selection to CREDIT or ALL so dues appear
+                            if (val &&
+                                _selectedOrderType != 'ALL' &&
+                                _selectedOrderType != 'CREDIT') {
+                              _selectedOrderType = 'CREDIT';
+                            }
+                          });
+                          _fetchRecentOrders();
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
             Expanded(
               child:
                   _isLoading
@@ -399,7 +691,7 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                       : _orders.isEmpty
                       ? const Center(
                         child: Text(
-                          "No recent orders found.",
+                          "No recent orders found for matching filters.",
                           style: TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                       )
@@ -409,7 +701,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                         itemBuilder: (context, index) {
                           final order = _orders[index];
 
-                          // 1. Extract ALL variables first!
                           final orderId =
                               order['order_id']?.toString() ?? 'N/A';
                           final orderType =
@@ -427,7 +718,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                           final mobileNo =
                               order['order_mobile_no']?.toString() ?? '';
 
-                          // 2. Extract Financials
                           final totalAmount =
                               double.tryParse(
                                 order['total_amount']?.toString() ?? '0',
@@ -444,13 +734,12 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                               ) ??
                               0;
 
-                          // 3. Ledger Math
                           final balanceDue = totalAmount - paidAmount;
-                          final isPartiallyPaid =
-                              orderStatus == 'pending' &&
-                              paidAmount > 0 &&
-                              balanceDue > 0;
                           final isOnline = orderType == 'ONLINE';
+                          final isCreditType = orderType == 'CREDIT';
+
+                          final hasPendingDues =
+                              isCreditType && (balanceDue > 0);
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
@@ -466,30 +755,34 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                               ),
                               child: Row(
                                 children: [
-                                  // Icon
                                   Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
                                       color:
                                           isOnline
                                               ? Colors.blue.shade50
-                                              : Colors.green.shade50,
+                                              : (isCreditType
+                                                  ? Colors.orange.shade50
+                                                  : Colors.green.shade50),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
                                       isOnline
                                           ? Icons.qr_code_2
-                                          : Icons.payments,
+                                          : (isCreditType
+                                              ? Icons.menu_book
+                                              : Icons.payments),
                                       color:
                                           isOnline
                                               ? Colors.blue.shade600
-                                              : Colors.green.shade600,
+                                              : (isCreditType
+                                                  ? Colors.orange.shade600
+                                                  : Colors.green.shade600),
                                       size: 20,
                                     ),
                                   ),
                                   const SizedBox(width: 16),
 
-                                  // Order Details
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -531,8 +824,7 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                                             ),
                                             const SizedBox(width: 8),
 
-                                            // SMART STATUS BADGE
-                                            if (isPartiallyPaid)
+                                            if (hasPendingDues)
                                               Container(
                                                 padding:
                                                     const EdgeInsets.symmetric(
@@ -540,21 +832,21 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                                                       vertical: 2,
                                                     ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.purple.shade50,
+                                                  color: Colors.orange.shade50,
                                                   borderRadius:
                                                       BorderRadius.circular(4),
                                                   border: Border.all(
                                                     color:
-                                                        Colors.purple.shade200,
+                                                        Colors.orange.shade200,
                                                   ),
                                                 ),
                                                 child: Text(
-                                                  "PARTIALLY PAID",
+                                                  "CREDIT / DUE",
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
                                                     color:
-                                                        Colors.purple.shade700,
+                                                        Colors.orange.shade800,
                                                   ),
                                                 ),
                                               )
@@ -619,7 +911,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                                     ),
                                   ),
 
-                                  // FINANCIALS COLUMN
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -632,7 +923,7 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                                           color: Colors.black,
                                         ),
                                       ),
-                                      if (isPartiallyPaid) ...[
+                                      if (hasPendingDues) ...[
                                         Text(
                                           "Paid: ₹${paidAmount.toStringAsFixed(0)}",
                                           style: TextStyle(
@@ -669,9 +960,40 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                                   ),
                                   const SizedBox(width: 12),
 
-                                  // Quick Action Icons
                                   Row(
                                     children: [
+                                      if (hasPendingDues)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 8.0,
+                                          ),
+                                          child: ElevatedButton.icon(
+                                            onPressed:
+                                                () => _showPaymentDialog(
+                                                  order,
+                                                  balanceDue,
+                                                ),
+                                            icon: const Icon(
+                                              Icons.payment,
+                                              size: 16,
+                                            ),
+                                            label: const Text("Pay Dues"),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  Colors.green.shade700,
+                                              foregroundColor: Colors.white,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
+                                                  ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       IconButton(
                                         icon: const Icon(Icons.edit_note),
                                         color: Colors.orange.shade700,
@@ -682,7 +1004,6 @@ class _RecentBillsModalState extends State<RecentBillsModal> {
                                               int.tryParse(orderId) ?? 0,
                                             ),
                                       ),
-                                      // 🟢 UPDATED: Calls the _printOrder function!
                                       IconButton(
                                         icon: const Icon(Icons.print_outlined),
                                         color: Colors.blueGrey,
