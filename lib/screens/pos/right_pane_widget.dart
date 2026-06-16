@@ -1158,6 +1158,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Row(
                       children: [
@@ -1311,32 +1312,35 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                           ),
                       ],
                     ),
-                    Text(
-                      "Gross: ₹${appProvider.cartSubtotal.toStringAsFixed(0)}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
+
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          "Gross: ₹${appProvider.cartSubtotal.toStringAsFixed(0)}",
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+
+                        const SizedBox(height: 4),
+
+                        Opacity(
+                          opacity: appProvider.cartTotalDiscount > 0 ? 1 : 0,
+                          child: Text(
+                            "Discounts: -₹${appProvider.cartTotalDiscount.toStringAsFixed(0)}",
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 4),
-
-                if (appProvider.cartTotalDiscount > 0)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text(
-                        "Discounts: -₹${appProvider.cartTotalDiscount.toStringAsFixed(0)}",
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
 
                 const Divider(height: 12),
 
