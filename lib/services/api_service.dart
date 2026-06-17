@@ -23,8 +23,8 @@ class ApiService {
   // static const String baseUrl = 'http://localhost:3131/storelocate';
   // static const String baseUrl = 'http://13.233.150.163:8084/storelocate';
   // static const String baseUrl = 'http://172.20.10.4:8084/storelocate';
-  static const String baseUrl = 'http://192.168.29.72:3131/storelocate'; //Local
-  // static const String baseUrl = 'https://store-locater.bilipatra.com/storelocate'; //Live
+  // static const String baseUrl = 'http://192.168.29.72:3131/storelocate'; //Local
+  static const String baseUrl = 'https://store-locater.bilipatra.com/storelocate'; //Live
   // static const String baseUrl = 'http://3.108.43.136:8084/storelocate'; //Dev
   ApiService(this.context);
 
