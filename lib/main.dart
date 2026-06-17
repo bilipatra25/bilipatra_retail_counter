@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import 'firebase_options.dart';
 import 'providers/app_provider.dart';
+import 'providers/auth_provider.dart';
 import 'routes/app_router.dart';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -42,13 +43,37 @@ Future<void> main() async {
   runApp(const BilipatraApp());
 }
 
-class BilipatraApp extends StatelessWidget {
+class BilipatraApp extends StatefulWidget {
   const BilipatraApp({super.key});
 
   @override
+  State<BilipatraApp> createState() => _BilipatraAppState();
+}
+
+class _BilipatraAppState extends State<BilipatraApp> {
+  late final AuthProvider _authProvider;
+  late final GoRouter _appRouter;
+
+  @override
+  void initState() {
+    super.initState();
+    _authProvider = AuthProvider();
+    _appRouter = createAppRouter(_authProvider);
+  }
+
+  @override
+  void dispose() {
+    _authProvider.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider.value(value: _authProvider),
+      ],
       child: MaterialApp.router(
         debugShowCheckedModeBanner: false,
         title: 'Bilipatra Retail Counter',
@@ -63,7 +88,7 @@ class BilipatraApp extends StatelessWidget {
           return NetworkAwareWrapper(child: child ?? const SizedBox.shrink());
         },
 
-        routerConfig: appRouter,
+        routerConfig: _appRouter,
       ),
     );
   }

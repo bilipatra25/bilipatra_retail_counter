@@ -2,6 +2,10 @@ import 'package:bilipatra_retail_counter/screens/pos/payment_qr_page.dart';
 import 'package:bilipatra_retail_counter/screens/pos/recent_bills_modal.dart';
 import 'package:bilipatra_retail_counter/screens/pos/right_pane_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 import 'package:package_info_plus/package_info_plus.dart'; // 🟢 Added this import
 import '../wholesale_inquiry_bottom_sheet.dart';
 import 'admin_dashboard_modal.dart';
@@ -366,6 +370,38 @@ class _PosDashboardScreenState extends State<PosDashboardScreen> {
             ),
           ),
           const SizedBox(width: 16),
+          
+          // 🟢 NEW: Logout Button
+          IconButton(
+            tooltip: "Logout",
+            icon: const Icon(Icons.logout, color: Colors.red),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Logout"),
+                  content: const Text("Are you sure you want to log out?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Cancel"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text("Logout", style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+              );
+              
+              if (confirm == true && context.mounted) {
+                // Ignore the lint error for context.read by using provider correctly
+                context.read<AuthProvider>().logout();
+              }
+            },
+          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Row(

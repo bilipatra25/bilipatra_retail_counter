@@ -96,6 +96,16 @@ class _LeftPaneWidgetState extends State<LeftPaneWidget> {
     }
   }
 
+  void refreshProducts() {
+    setState(() {
+      _products.clear();
+      _currentPage = 1;
+      _hasMore = true;
+      _searchController.clear();
+    });
+    _fetchProducts();
+  }
+
   List<ProductModel> get _filteredProducts {
     String query = _searchController.text.toLowerCase();
 
@@ -273,6 +283,12 @@ class _LeftPaneWidgetState extends State<LeftPaneWidget> {
                   ),
                 ),
                 const SizedBox(width: 12),
+                IconButton(
+                  tooltip: "Refresh Products",
+                  icon: const Icon(Icons.refresh, color: Colors.green),
+                  onPressed: refreshProducts,
+                ),
+                const SizedBox(width: 8),
                 ElevatedButton.icon(
                   onPressed: () => _openManageProducts(context),
                   icon: const Icon(Icons.edit_note),

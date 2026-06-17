@@ -6,6 +6,11 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/auth_provider.dart';
 
 import '../models/TotalOrderReport.dart';
 import '../models/common_response.dart';
@@ -15,12 +20,11 @@ import '../utils/logger.dart';
 class ApiService {
   final BuildContext context;
 
-  // static const String baseUrl = 'http://localhost:8084/storelocate';
+  // static const String baseUrl = 'http://localhost:3131/storelocate';
   // static const String baseUrl = 'http://13.233.150.163:8084/storelocate';
   // static const String baseUrl = 'http://172.20.10.4:8084/storelocate';
-  // static const String baseUrl = 'http://192.168.31.150:8084/storelocate'; //Local
-  static const String baseUrl =
-      'https://store-locater.bilipatra.com/storelocate'; //Live
+  static const String baseUrl = 'http://192.168.29.72:3131/storelocate'; //Local
+  // static const String baseUrl = 'https://store-locater.bilipatra.com/storelocate'; //Live
   // static const String baseUrl = 'http://3.108.43.136:8084/storelocate'; //Dev
   ApiService(this.context);
 
@@ -55,39 +59,46 @@ class ApiService {
 
   // Common Headers
   Future<Map<String, String>> _getHeaders() async {
-    // final String? token = await SharedPrefsUtil.getToken();
+    final prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('jwt_token');
+
     return {
       'Content-Type': 'application/json; charset=UTF-8',
-      // if (token != null) 'authorization': token,
+      if (token != null) 'Authorization': 'Bearer $token',
     };
   }
 
   // Session Expired Handler (Singleton Approach)
   static bool _isSessionDialogVisible = false;
 
-  void _showSessionExpiredDialog(BuildContext context) {
+  void _showSessionExpiredDialog(BuildContext context) async {
     if (_isSessionDialogVisible) return;
     _isSessionDialogVisible = true;
 
     showDialog(
       context: context,
+      barrierDismissible: false, // 🟢 Force the user to click Ok
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text("Session Expired"),
-          content: Text("Your session has expired. Please log in again."),
+          title: const Text("Session Expired"),
+          content: const Text("Your session has expired. Please log in again."),
           actions: [
             TextButton(
               onPressed: () {
                 _isSessionDialogVisible = false;
                 context.pop();
-                // context.go(AppRoutePaths.login);
+                // Trigger global logout and redirect
+                context.read<AuthProvider>().logout();
               },
-              child: Text("Ok"),
+              child: const Text("Ok"),
             ),
           ],
         );
       },
-    );
+    ).then((_) {
+      // 🟢 Just in case it gets dismissed by the system, reset the flag
+      _isSessionDialogVisible = false;
+    });
   }
 
   // Generic API Request Handler
@@ -119,7 +130,7 @@ class ApiService {
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        if (data['code'] == 401) {
+        if (data['code'] == 401 || data['code'] == 701) {
           _showSessionExpiredDialog(context);
           return CommonResponse(
             flag: 0,
@@ -128,6 +139,13 @@ class ApiService {
           ).toJson();
         }
         return data;
+      } else if (response.statusCode == 401) {
+        _showSessionExpiredDialog(context);
+        return CommonResponse(
+          flag: 0,
+          code: 401,
+          message: "Session expired",
+        ).toJson();
       } else {
         throw ApiException(
           response.statusCode,
@@ -226,7 +244,7 @@ class ApiService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        if (data['code'] == 401 /*&& mounted*/ ) {
+        if (data['code'] == 401 || data['code'] == 701 /*&& mounted*/ ) {
           _showSessionExpiredDialog(context);
           return CommonResponse(
             flag: 0,
@@ -235,6 +253,13 @@ class ApiService {
           ).toJson();
         }
         return data;
+      } else if (response.statusCode == 401) {
+        _showSessionExpiredDialog(context);
+        return CommonResponse(
+          flag: 0,
+          code: 401,
+          message: "Session expired",
+        ).toJson();
       } else {
         throw ApiException(
           response.statusCode,
@@ -311,15 +336,26 @@ class ApiService {
     );
   }
 
-  Future<Map<String, dynamic>> loginExample(
+  Future<Map<String, dynamic>> storeLogin(
     String mobile,
     String password,
   ) async {
-    return await _makeRequest(
+    final res = await _makeRequest(
       HttpMethod.post,
-      "auth/login",
-      body: {'mobile': mobile, 'password': password},
+      "store_detail/v1/login",
+      body: {'mobile_no': mobile, 'password': password},
     );
+
+    // Auto-save token if login is successful
+    if (res['flag'] == 1 && res['data'] != null && res['data'].isNotEmpty) {
+      final token = res['data'][0]['token'];
+      if (token != null) {
+        // We do not save to SharedPreferences here anymore because
+        // AuthProvider handles it. We just return the response.
+      }
+    }
+
+    return res;
   }
 
   Future<Map<String, dynamic>> updateProfile(
