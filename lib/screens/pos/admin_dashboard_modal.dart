@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:file_picker/file_picker.dart';
 
 class AdminDashboardModal extends StatefulWidget {
   final String url;
@@ -43,7 +45,7 @@ class _AdminDashboardModalState extends State<AdminDashboardModal> {
         ? '${widget.url}&token=$encodedToken&user=$encodedUser' 
         : '${widget.url}?token=$encodedToken&user=$encodedUser';
 
-    _controller = WebViewController()
+    final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
@@ -53,8 +55,29 @@ class _AdminDashboardModalState extends State<AdminDashboardModal> {
             }
           },
         ),
-      )
-      ..loadRequest(Uri.parse(urlWithToken));
+      );
+
+    // 🟢 Handle Android File Chooser
+    if (controller.platform is AndroidWebViewController) {
+      final androidController = controller.platform as AndroidWebViewController;
+      androidController.setOnShowFileSelector((FileSelectorParams params) async {
+        final result = await FilePicker.pickFiles(
+          allowMultiple: params.mode == FileSelectorMode.openMultiple,
+          type: FileType.any,
+        );
+        if (result != null && result.files.isNotEmpty) {
+          // WebView on Android expects proper file:// or content:// URIs,
+          // so we map the raw absolute paths to file:// URIs.
+          return result.paths
+              .whereType<String>()
+              .map((path) => Uri.file(path).toString())
+              .toList();
+        }
+        return [];
+      });
+    }
+
+    _controller = controller..loadRequest(Uri.parse(urlWithToken));
 
     if (mounted) setState(() {});
   }
