@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
@@ -20,6 +21,27 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedMobile = prefs.getString('saved_mobile');
+    final savedPassword = prefs.getString('saved_password');
+    
+    if (savedMobile != null && savedPassword != null) {
+      if (mounted) {
+        setState(() {
+          _mobileController.text = savedMobile;
+          _passwordController.text = savedPassword;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -46,6 +68,12 @@ class _LoginScreenState extends State<LoginScreen> {
         // Success
         final token = response['data'][0]['token'];
         final userJson = jsonEncode(response['data'][0]);
+        
+        // Save credentials for next time
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('saved_mobile', _mobileController.text.trim());
+        await prefs.setString('saved_password', _passwordController.text);
+
         if (mounted) {
           await context.read<AuthProvider>().login(token, userJson);
           // GoRouter will automatically redirect via refreshListenable
