@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AdminDashboardModal extends StatefulWidget {
   final String url;
@@ -22,18 +24,39 @@ class _AdminDashboardModalState extends State<AdminDashboardModal> {
   @override
   void initState() {
     super.initState();
+    _initWebView();
+  }
 
-    _controller =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageFinished: (String url) {
-                setState(() => _isLoading = false);
-              },
-            ),
-          )
-          ..loadRequest(Uri.parse(widget.url)); // 🟢 Use the dynamic URL
+  Future<void> _initWebView() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token') ?? '';
+    final userJson = prefs.getString('user_json') ?? '{}';
+    
+    // Base64 encode the userJson to safely pass it in the URL
+    final base64User = base64Encode(utf8.encode(userJson));
+    
+    // Append the JWT token and base64 user as query parameters
+    final encodedToken = Uri.encodeComponent(token);
+    final encodedUser = Uri.encodeComponent(base64User);
+    
+    final urlWithToken = widget.url.contains('?') 
+        ? '${widget.url}&token=$encodedToken&user=$encodedUser' 
+        : '${widget.url}?token=$encodedToken&user=$encodedUser';
+
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (String url) {
+            if (mounted) {
+              setState(() => _isLoading = false);
+            }
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(urlWithToken));
+
+    if (mounted) setState(() {});
   }
 
   @override

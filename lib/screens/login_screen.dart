@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -44,8 +45,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response['flag'] == 1 && response['data'] != null && response['data'].isNotEmpty) {
         // Success
         final token = response['data'][0]['token'];
+        final userJson = jsonEncode(response['data'][0]);
         if (mounted) {
-          await context.read<AuthProvider>().login(token);
+          await context.read<AuthProvider>().login(token, userJson);
           // GoRouter will automatically redirect via refreshListenable
         }
       } else {
