@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:bilipatra_retail_counter/printerenum.dart';
 import 'package:bilipatra_retail_counter/services/api_service.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/order_model.dart';
 import 'models/order_product.dart';
@@ -183,6 +185,22 @@ class TestPrint {
     bool? isConnected = await bluetooth.isConnected;
     if (isConnected != true) return;
 
+    // Load store details
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    String storeName = "Vraj Prachin Ayurved Chikitsa Kendra";
+    String address = "";
+    String phone = "";
+
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeName = userData['store_name'] ?? storeName;
+        address = userData['address'] ?? "";
+        phone = userData['mobile_no'] ?? "";
+      } catch (_) {}
+    }
+
     final now = DateTime.now();
     final formattedDate = DateFormat('dd-MM-yyyy HH:mm').format(now);
 
@@ -196,15 +214,18 @@ class TestPrint {
 
     bluetooth.printNewLine();
     bluetooth.printCustom("Bilipatra Retail", Size.boldMedium.val, Align.center.val);
-    bluetooth.printNewLine();
-    bluetooth.printCustom("GSTIN: 24AFXPJ5756J1ZR", Size.medium.val, Align.center.val);
-    bluetooth.printCustom("FSSAI: 1072298000084", Size.medium.val, Align.center.val);
-    bluetooth.printCustom(
-      "F-2, Soham Pride,Nr. Time Square-Gauravpath, Besides DMART, TP 10 Main Rd, Pal Gam, Surat, Gujarat 395009",
-      Size.medium.val,
-      Align.center.val,
-    );
-    bluetooth.printCustom("+91 91043 32327 | care@bilipatra.com", Size.medium.val, Align.center.val);
+    bluetooth.printCustom(storeName, Size.medium.val, Align.center.val);
+    
+    if (address.isNotEmpty) {
+      List<String> addrLines = _wrapText(address, 42);
+      for (var line in addrLines) {
+        bluetooth.printCustom(line, Size.medium.val, Align.center.val);
+      }
+    }
+    if (phone.isNotEmpty) {
+      bluetooth.printCustom("+91 $phone", Size.medium.val, Align.center.val);
+    }
+    
     bluetooth.printCustom("INVOICE", Size.bold.val, Align.center.val);
     bluetooth.printCustom("--------------------------------", Size.medium.val, Align.center.val);
 

@@ -28,17 +28,21 @@ Future<void> main() async {
   // ✅ Now initialize FCM and related configurations
   await NotificationService.instance.initialize();
 
-  // 🧪 Debug: Print FCM Token
-  String? token = await FirebaseMessaging.instance.getToken();
-  print('🔔 FCM Token: $token');
+  try {
+    // 🧪 Debug: Print FCM Token
+    String? token = await FirebaseMessaging.instance.getToken();
+    print('🔔 FCM Token: $token');
 
-  // Foreground message listener
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-    print("🔔 Foreground notification: ${message.notification?.title}");
+    // Foreground message listener
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      print("🔔 Foreground notification: ${message.notification?.title}");
 
-    // Show as local notification when app is in foreground
-    await NotificationService.instance.showNotification(message);
-  });
+      // Show as local notification when app is in foreground
+      await NotificationService.instance.showNotification(message);
+    });
+  } catch (e) {
+    print('🔔 FCM Initialization failed (expected on web if not fully configured): $e');
+  }
 
   runApp(const BilipatraApp());
 }
