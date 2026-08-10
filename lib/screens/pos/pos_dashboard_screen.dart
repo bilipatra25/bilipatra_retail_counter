@@ -1,6 +1,7 @@
 import 'package:bilipatra_retail_counter/screens/pos/payment_qr_page.dart';
 import 'package:bilipatra_retail_counter/screens/pos/recent_bills_modal.dart';
 import 'package:bilipatra_retail_counter/screens/pos/right_pane_widget.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,22 +46,30 @@ class _PosDashboardScreenState extends State<PosDashboardScreen> {
   }
 
   // 🟢 Helper function to launch the WebView
-  void _openAdminDashboard(BuildContext context) {
+  void _openAdminDashboard(BuildContext context) async {
     const String adminMobile = "9974882009";
     const String adminPassword = "vraj@123";
     // Point this one to the main dashboard / orderList
     final String targetUrl =
         'https://retail-counter.bilipatra.com/login?username=$adminMobile&password=$adminPassword&redirect=/admin/orderList';
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (context) => AdminDashboardModal(
-            url: targetUrl,
-            title: "Admin Dashboard", // Title for the main dashboard
-          ),
-    );
+    if (kIsWeb) {
+      // WebView iframe is usually blocked by X-Frame-Options on web, so open in a new tab
+      final uri = Uri.parse(targetUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } else {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => AdminDashboardModal(
+              url: targetUrl,
+              title: "Admin Dashboard", // Title for the main dashboard
+            ),
+      );
+    }
   }
 
   // ==========================================

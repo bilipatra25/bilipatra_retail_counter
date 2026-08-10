@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -20,8 +21,9 @@ import '../utils/logger.dart';
 class ApiService {
   final BuildContext context;
 
+  // static const String baseUrl = 'http://10.0.2.2:3131/storelocate';
   // static const String baseUrl = 'http://localhost:3131/storelocate';
-  // static const String baseUrl = 'http://13.233.150.163:8084/storelocate';
+
   // static const String baseUrl = 'http://172.20.10.4:8084/storelocate';
   // static const String baseUrl = 'http://192.168.29.72:3131/storelocate'; //Local
   static const String baseUrl = 'https://store-locater.bilipatra.com/storelocate'; //Live
@@ -281,9 +283,12 @@ class ApiService {
 
     // Step 1: Check if there is an active network connection (WiFi/Mobile)
     if (!connectivityResult.contains(ConnectivityResult.mobile) &&
-        !connectivityResult.contains(ConnectivityResult.wifi)) {
+        !connectivityResult.contains(ConnectivityResult.wifi) &&
+        !connectivityResult.contains(ConnectivityResult.ethernet)) {
       return false; // No network detected
     }
+
+    if (kIsWeb) return true; // InternetAddress is not supported on Web
 
     // Step 2: Verify actual internet access by making a lightweight test request
     try {
@@ -384,8 +389,19 @@ class ApiService {
   ///Example Ends ------
 
   Future<Map<String, dynamic>> userSelectByMobileNo(String mobile) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     return await _postRequest("retailcounter_customer/v1/get-user-orders", {
       'mobile_no': int.parse(mobile),
+      if (storeId != null) 'store_id': storeId,
     });
   }
 
@@ -394,10 +410,21 @@ class ApiService {
     String mobile,
     String address,
   ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     return await _postRequest("retailcounter_customer/v1/apiinsert", {
       'customer_name': customerName,
       'mobile_no': int.parse(mobile),
       'address': address,
+      if (storeId != null) 'store_id': storeId,
     });
   }
 
@@ -433,12 +460,23 @@ class ApiService {
   }
 
   Future<List<ProductModel>> productList(int pageIndex, int pageSize) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     final response = await _postRequest(
       "retail_product_detail/v1/retail_apiselectall",
       {
         'pageIndex': pageIndex,
         'pageSize': pageSize,
         'searchParam': {'global_search': '', 'product_name': ''},
+        if (storeId != null) 'store_id': storeId,
       },
     );
     if (response['flag'] == 1 && response['code'] == 200) {
@@ -453,9 +491,23 @@ class ApiService {
     String start_date,
     String end_date,
   ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     final response = await _postRequest(
       "retailcounter_order/v1/TotalOrderReport",
-      {'start_date': start_date, 'end_date': end_date},
+      {
+        'start_date': start_date,
+        'end_date': end_date,
+        if (storeId != null) 'store_id': storeId,
+      },
     );
     if (response['flag'] == 1 && response['code'] == 200) {
       return TotalOrderReport.fromJson(response);
@@ -464,6 +516,21 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
+    // Inject store_id into the payload
+    if (storeId != null) {
+      data['store_id'] = storeId;
+    }
+
     final response = await _postRequest(
       'retailcounter_order/v1/apiinsert',
       data,
@@ -477,6 +544,19 @@ class ApiService {
 
   // 🟢 NEW: The Update Route
   Future<Map<String, dynamic>> updateOrder(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+    if (storeId != null) {
+      data['store_id'] = storeId;
+    }
+
     // Note: Double check if your backend uses 'apiupdate' or 'update' for this endpoint!
     final response = await _postRequest(
       'retailcounter_order/v1/apiupdate',
@@ -495,21 +575,48 @@ class ApiService {
     String orderType = 'ALL', // 🟢 NEW
     bool hasDues = false, // 🟢 NEW
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
+    final Map<String, dynamic> payload = {
+      "page": page,
+      "limit": limit,
+      "order_type": orderType,
+      "has_dues": hasDues,
+    };
+
+    if (storeId != null) {
+      payload["store_id"] = storeId;
+    }
+
     final response = await _postRequest(
       'retailcounter_order/v1/orderlist', // (તમારો જે સાચો રૂટ હોય તે જ રાખજો)
-      {
-        "page": page,
-        "limit": limit,
-        "order_type": orderType,
-        "has_dues": hasDues,
-      },
+      payload,
     );
     return response;
   }
 
   Future<Map<String, dynamic>> orderListById(String orderId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     return await _postRequest("retailcounter_order/v1/orderlistbyid", {
       'order_id': orderId,
+      if (storeId != null) 'store_id': storeId,
     });
   }
 
@@ -518,12 +625,23 @@ class ApiService {
     required String mobileNo,
     required String address,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     return await _postRequest(
       "retailcounter_customer/v1/sendwholesaleinquiry",
       {
         "customer_name": customerName,
         "mobile_no": mobileNo,
         "address": address,
+        if (storeId != null) "store_id": storeId,
       },
     );
   }
@@ -547,8 +665,19 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> cancelOrder(int orderId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     return await _postRequest("retailcounter_order/v1/delete", {
       'order_id': orderId,
+      if (storeId != null) 'store_id': storeId,
     });
   }
 
@@ -557,9 +686,23 @@ class ApiService {
     String startDate,
     String endDate,
   ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     final response = await _postRequest(
       'retailcounter_order/v1/TotalOrderReport',
-      {"start_date": startDate, "end_date": endDate},
+      {
+        "start_date": startDate,
+        "end_date": endDate,
+        if (storeId != null) "store_id": storeId,
+      },
     );
     return response;
   }
@@ -568,26 +711,50 @@ class ApiService {
     int orderId,
     String mobileNo,
   ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     final response = await _postRequest(
       'retailcounter_order/v1/send-payment-whatsapp',
-      {"order_id": orderId, "mobile_no": mobileNo},
+      {
+        "order_id": orderId, 
+        "mobile_no": mobileNo,
+        if (storeId != null) "store_id": storeId,
+      },
     );
     return response;
   }
 
   // 🟢 1. Fetch Pending Bills
   Future<Map<String, dynamic>> getCustomerPendingBills(int customerId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
+    String url = '$baseUrl/retailcounter_order/v1/pending-bills?customer_id=$customerId';
+    if (storeId != null) {
+      url += '&store_id=$storeId';
+    }
+
     final response = await http.get(
-      Uri.parse(
-        '$baseUrl/retailcounter_order/v1/pending-bills?customer_id=$customerId',
-      ),
+      Uri.parse(url),
       headers: await _getHeaders(),
     );
 
-    _logResponse(
-      '$baseUrl/retailcounter_order/v1/ pending-bills?customer_id=$customerId',
-      response,
-    );
+    _logResponse(url, response);
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -602,11 +769,22 @@ class ApiService {
     required double amount,
     required String paymentMethod,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('user_json');
+    int? storeId;
+    if (userJson != null) {
+      try {
+        final userData = jsonDecode(userJson);
+        storeId = userData['store_id'];
+      } catch (_) {}
+    }
+
     final response = await _postRequest('retailcounter_order/v1/pay-bill', {
       "order_id": orderId,
       "customer_id": customerId,
       "amount": amount,
       "payment_method": paymentMethod, // 'cash' or 'online'
+      if (storeId != null) "store_id": storeId,
     });
     return response;
   }
