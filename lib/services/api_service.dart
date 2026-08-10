@@ -1,0 +1,626 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/auth_provider.dart';
+
+import '../models/TotalOrderReport.dart';
+import '../models/common_response.dart';
+import '../models/product.dart';
+import '../utils/logger.dart';
+
+class ApiService {
+  final BuildContext context;
+
+  // static const String baseUrl = 'http://localhost:3131/storelocate';
+  // static const String baseUrl = 'http://13.233.150.163:8084/storelocate';
+  // static const String baseUrl = 'http://172.20.10.4:8084/storelocate';
+  // static const String baseUrl = 'http://192.168.29.72:3131/storelocate'; //Local
+  static const String baseUrl = 'https://store-locater.bilipatra.com/storelocate'; //Live
+  // static const String baseUrl = 'http://3.108.43.136:8084/storelocate'; //Dev
+  ApiService(this.context);
+
+  void _logRequest(
+    String endpoint,
+    Map<String, dynamic> body,
+    Map<String, String> header,
+  ) {
+    _printLog("🟢 [API REQUEST] 🌍 Endpoint: $endpoint");
+    _printLog("📦 Body: ${jsonEncode(body)}");
+    _printLog("📝 Headers: ${jsonEncode(header)}");
+  }
+
+  void _logResponse(String endpoint, http.Response response) {
+    final status = response.statusCode;
+    String statusEmoji = (status == 200) ? "✅" : "❌";
+
+    _printLog("$statusEmoji [API RESPONSE] 🌍 Endpoint: $endpoint");
+    _printLog("📡 Status Code: $status");
+    _printLog("📜 Body: ${response.body}");
+  }
+
+  void _logError(String endpoint, dynamic error) {
+    _printLog("🚨 [API ERROR] 🌍 Endpoint: $endpoint");
+    _printLog("❌ Error: $error");
+  }
+
+  // Utility function for formatted logging with colors
+  void _printLog(String message) {
+    debugPrint('\x1B[34m$message\x1B[0m', wrapWidth: 1024);
+  }
+
+  // Common Headers
+  Future<Map<String, String>> _getHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('jwt_token');
+
+    return {
+      'Content-Type': 'application/json; charset=UTF-8',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  // Session Expired Handler (Singleton Approach)
+  static bool _isSessionDialogVisible = false;
+
+  void _showSessionExpiredDialog(BuildContext context) async {
+    if (_isSessionDialogVisible) return;
+    _isSessionDialogVisible = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // 🟢 Force the user to click Ok
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Session Expired"),
+          content: const Text("Your session has expired. Please log in again."),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _isSessionDialogVisible = false;
+                context.pop();
+                // Trigger global logout and redirect
+                context.read<AuthProvider>().logout();
+              },
+              child: const Text("Ok"),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      // 🟢 Just in case it gets dismissed by the system, reset the flag
+      _isSessionDialogVisible = false;
+    });
+  }
+
+  // Generic API Request Handler
+  Future<Map<String, dynamic>> _postRequest(
+    String endpoint,
+    Map<String, dynamic> body,
+  ) async {
+    final url = Uri.parse('$baseUrl/$endpoint');
+    final headers = await _getHeaders();
+
+    // Check internet connection before making request
+    if (!await _isConnected()) {
+      _showNoInternetDialog(context);
+      return CommonResponse(
+        flag: 0,
+        code: 500,
+        message: "No internet connection",
+      ).toJson();
+    }
+
+    _logRequest(url.toString(), body, headers);
+
+    try {
+      final response = await http
+          .post(url, headers: headers, body: jsonEncode(body))
+          .timeout(Duration(seconds: 30)); // Increased timeout
+
+      _logResponse(url.toString(), response);
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        if (data['code'] == 401 || data['code'] == 701) {
+          _showSessionExpiredDialog(context);
+          return CommonResponse(
+            flag: 0,
+            code: 401,
+            message: "Session expired",
+          ).toJson();
+        }
+        return data;
+      } else if (response.statusCode == 401) {
+        _showSessionExpiredDialog(context);
+        return CommonResponse(
+          flag: 0,
+          code: 401,
+          message: "Session expired",
+        ).toJson();
+      } else {
+        throw ApiException(
+          response.statusCode,
+          data['message'] ?? 'Unknown error',
+        );
+      }
+    } on SocketException {
+      throw ApiException(500, "No internet connection");
+    } on TimeoutException {
+      throw ApiException(500, "Request timed out");
+    } catch (e) {
+      _logError(url.toString(), e);
+      throw ApiException(500, "Unexpected error: $e");
+    }
+  }
+
+  Future<Map<String, dynamic>> _makeRequest(
+    HttpMethod method,
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Map<String, dynamic>? queryParams,
+    Map<String, String>? multipartFields,
+    Map<String, File>? multipartFiles,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/$endpoint',
+    ).replace(queryParameters: queryParams);
+    final headers = await _getHeaders();
+
+    if (!await _isConnected()) {
+      /*if (mounted)*/
+      _showNoInternetDialog(context);
+      return CommonResponse(
+        flag: 0,
+        code: 500,
+        message: "No internet connection",
+      ).toJson();
+    }
+
+    _logRequest(
+      uri.toString(),
+      body ?? queryParams ?? multipartFields!,
+      headers,
+    );
+
+    try {
+      late http.Response response;
+
+      switch (method) {
+        case HttpMethod.get:
+          response = await http
+              .get(uri, headers: headers)
+              .timeout(Duration(seconds: 30));
+          break;
+
+        case HttpMethod.post:
+          response = await http
+              .post(uri, headers: headers, body: jsonEncode(body))
+              .timeout(Duration(seconds: 30));
+          break;
+
+        case HttpMethod.put:
+          response = await http
+              .put(uri, headers: headers, body: jsonEncode(body))
+              .timeout(Duration(seconds: 30));
+          break;
+
+        case HttpMethod.delete:
+          response = await http
+              .delete(uri, headers: headers, body: jsonEncode(body))
+              .timeout(Duration(seconds: 30));
+          break;
+
+        case HttpMethod.multipart:
+          var request = http.MultipartRequest('POST', uri);
+          request.headers.addAll(headers);
+          multipartFields?.forEach((key, value) {
+            request.fields[key] = value;
+          });
+          final files = multipartFiles ?? {};
+
+          for (var entry in files.entries) {
+            final file = await http.MultipartFile.fromPath(
+              entry.key,
+              entry.value.path,
+            );
+            request.files.add(file);
+          }
+
+          var streamed = await request.send();
+          response = await http.Response.fromStream(streamed);
+          break;
+      }
+
+      _logResponse(uri.toString(), response);
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        if (data['code'] == 401 || data['code'] == 701 /*&& mounted*/ ) {
+          _showSessionExpiredDialog(context);
+          return CommonResponse(
+            flag: 0,
+            code: 401,
+            message: "Session expired",
+          ).toJson();
+        }
+        return data;
+      } else if (response.statusCode == 401) {
+        _showSessionExpiredDialog(context);
+        return CommonResponse(
+          flag: 0,
+          code: 401,
+          message: "Session expired",
+        ).toJson();
+      } else {
+        throw ApiException(
+          response.statusCode,
+          data['message'] ?? 'Unknown error',
+        );
+      }
+    } on SocketException {
+      throw ApiException(500, "No internet connection");
+    } on TimeoutException {
+      throw ApiException(500, "Request timed out");
+    } catch (e) {
+      _logError(uri.toString(), e);
+      throw ApiException(500, "Unexpected error: $e");
+    }
+  }
+
+  Future<bool> _isConnected() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+
+    // Step 1: Check if there is an active network connection (WiFi/Mobile)
+    if (!connectivityResult.contains(ConnectivityResult.mobile) &&
+        !connectivityResult.contains(ConnectivityResult.wifi)) {
+      return false; // No network detected
+    }
+
+    // Step 2: Verify actual internet access by making a lightweight test request
+    try {
+      final result = await InternetAddress.lookup(
+        '8.8.8.8',
+      ); // Google's Public DNS
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException {
+      return false; // No internet access
+    }
+  }
+
+  bool _isDialogShowing = false;
+
+  void _showNoInternetDialog(BuildContext context) {
+    if (_isDialogShowing) return;
+
+    _isDialogShowing = true;
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("No Internet"),
+            content: const Text(
+              "Please check your internet connection and try again.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _isDialogShowing = false; // Reset the flag
+                },
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+    ).then((_) {
+      _isDialogShowing =
+          false; // Also reset if dialog is dismissed via back button
+    });
+  }
+
+  ///Examples of different request method ------
+  Future<Map<String, dynamic>> getUserProfile(String userId) async {
+    return await _makeRequest(
+      HttpMethod.get,
+      "user/profile",
+      queryParams: {'user_id': userId},
+    );
+  }
+
+  Future<Map<String, dynamic>> storeLogin(
+    String mobile,
+    String password,
+  ) async {
+    final res = await _makeRequest(
+      HttpMethod.post,
+      "store_detail/v1/login",
+      body: {'mobile_no': mobile, 'password': password},
+    );
+
+    // Auto-save token if login is successful
+    if (res['flag'] == 1 && res['data'] != null && res['data'].isNotEmpty) {
+      final token = res['data'][0]['token'];
+      if (token != null) {
+        // We do not save to SharedPreferences here anymore because
+        // AuthProvider handles it. We just return the response.
+      }
+    }
+
+    return res;
+  }
+
+  Future<Map<String, dynamic>> updateProfile(
+    Map<String, dynamic> profileData,
+  ) async {
+    return await _makeRequest(HttpMethod.put, "user/update", body: profileData);
+  }
+
+  Future<Map<String, dynamic>> deleteAccount(String userId) async {
+    return await _makeRequest(
+      HttpMethod.delete,
+      "user/delete",
+      body: {'user_id': userId},
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadImage(File imageFile) async {
+    return await _makeRequest(
+      HttpMethod.multipart,
+      "user/upload",
+      multipartFields: {'description': 'Profile picture'},
+      multipartFiles: {'image': imageFile},
+    );
+  }
+
+  ///Example Ends ------
+
+  Future<Map<String, dynamic>> userSelectByMobileNo(String mobile) async {
+    return await _postRequest("retailcounter_customer/v1/get-user-orders", {
+      'mobile_no': int.parse(mobile),
+    });
+  }
+
+  Future<Map<String, dynamic>> customerLogin(
+    String customerName,
+    String mobile,
+    String address,
+  ) async {
+    return await _postRequest("retailcounter_customer/v1/apiinsert", {
+      'customer_name': customerName,
+      'mobile_no': int.parse(mobile),
+      'address': address,
+    });
+  }
+
+  Future<Map<String, dynamic>> saveFcmToken(
+    String deviceId,
+    String fcmToken,
+    String platform,
+  ) async {
+    return await _postRequest("retail_fcm_token/v1/saveretailfcmtoken", {
+      'device_id': deviceId,
+      'fcm_token': fcmToken,
+      'platform': platform,
+    });
+  }
+
+  Future<http.Response> insertUser(Map<String, dynamic> userData) async {
+    final url = '$baseUrl/user/v1/apiinsert';
+    final headers = {'Content-Type': 'application/json; charset=UTF-8'};
+    Logger.logRequest(url, headers, userData);
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: jsonEncode(userData),
+      );
+      Logger.logResponse(response.statusCode, response.body);
+      return response;
+    } catch (e) {
+      Logger.log('Error: $e');
+      throw Exception('Failed to insert user: $e');
+    }
+  }
+
+  Future<List<ProductModel>> productList(int pageIndex, int pageSize) async {
+    final response = await _postRequest(
+      "retail_product_detail/v1/retail_apiselectall",
+      {
+        'pageIndex': pageIndex,
+        'pageSize': pageSize,
+        'searchParam': {'global_search': '', 'product_name': ''},
+      },
+    );
+    if (response['flag'] == 1 && response['code'] == 200) {
+      final List<dynamic> results = response['data']['result'];
+      return results.map((product) => ProductModel.fromJson(product)).toList();
+    } else {
+      throw Exception('Failed to load products: ${response['message']}');
+    }
+  }
+
+  Future<TotalOrderReport?> fetchTotalOrderReport(
+    String start_date,
+    String end_date,
+  ) async {
+    final response = await _postRequest(
+      "retailcounter_order/v1/TotalOrderReport",
+      {'start_date': start_date, 'end_date': end_date},
+    );
+    if (response['flag'] == 1 && response['code'] == 200) {
+      return TotalOrderReport.fromJson(response);
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> data) async {
+    final response = await _postRequest(
+      'retailcounter_order/v1/apiinsert',
+      data,
+    );
+    if (response['flag'] == 1 && response['code'] == 200) {
+      return response['data'] ?? {}; // 🟢 Added fallback for empty data objects
+    } else {
+      throw Exception('Order failed: ${response['message']}');
+    }
+  }
+
+  // 🟢 NEW: The Update Route
+  Future<Map<String, dynamic>> updateOrder(Map<String, dynamic> data) async {
+    // Note: Double check if your backend uses 'apiupdate' or 'update' for this endpoint!
+    final response = await _postRequest(
+      'retailcounter_order/v1/apiupdate',
+      data,
+    );
+    if (response['flag'] == 1 && response['code'] == 200) {
+      return response['data'] ?? {};
+    } else {
+      throw Exception('Order update failed: ${response['message']}');
+    }
+  }
+
+  Future<Map<String, dynamic>> orderList(
+    int page,
+    int limit, {
+    String orderType = 'ALL', // 🟢 NEW
+    bool hasDues = false, // 🟢 NEW
+  }) async {
+    final response = await _postRequest(
+      'retailcounter_order/v1/orderlist', // (તમારો જે સાચો રૂટ હોય તે જ રાખજો)
+      {
+        "page": page,
+        "limit": limit,
+        "order_type": orderType,
+        "has_dues": hasDues,
+      },
+    );
+    return response;
+  }
+
+  Future<Map<String, dynamic>> orderListById(String orderId) async {
+    return await _postRequest("retailcounter_order/v1/orderlistbyid", {
+      'order_id': orderId,
+    });
+  }
+
+  Future<Map<String, dynamic>> sendWholesaleInquiry({
+    required String customerName,
+    required String mobileNo,
+    required String address,
+  }) async {
+    return await _postRequest(
+      "retailcounter_customer/v1/sendwholesaleinquiry",
+      {
+        "customer_name": customerName,
+        "mobile_no": mobileNo,
+        "address": address,
+      },
+    );
+  }
+
+  Future<Map<String, String>> fetchAppConfig() async {
+    final response = await _postRequest('/configuration/v1/apiselectall', {
+      "pageIndex": 1,
+      "pageSize": 20,
+    });
+
+    final List list = response['data']['result'];
+
+    final Map<String, String> config = {};
+
+    for (var item in list) {
+      config[item['configuration_key']] =
+          item['configuration_value'].toString();
+    }
+
+    return config;
+  }
+
+  Future<Map<String, dynamic>> cancelOrder(int orderId) async {
+    return await _postRequest("retailcounter_order/v1/delete", {
+      'order_id': orderId,
+    });
+  }
+
+  // 🟢 NEW: Fetch Dashboard Report Data
+  Future<Map<String, dynamic>> getDashboardReport(
+    String startDate,
+    String endDate,
+  ) async {
+    final response = await _postRequest(
+      'retailcounter_order/v1/TotalOrderReport',
+      {"start_date": startDate, "end_date": endDate},
+    );
+    return response;
+  }
+
+  Future<Map<String, dynamic>> sendPaymentWhatsapp(
+    int orderId,
+    String mobileNo,
+  ) async {
+    final response = await _postRequest(
+      'retailcounter_order/v1/send-payment-whatsapp',
+      {"order_id": orderId, "mobile_no": mobileNo},
+    );
+    return response;
+  }
+
+  // 🟢 1. Fetch Pending Bills
+  Future<Map<String, dynamic>> getCustomerPendingBills(int customerId) async {
+    final response = await http.get(
+      Uri.parse(
+        '$baseUrl/retailcounter_order/v1/pending-bills?customer_id=$customerId',
+      ),
+      headers: await _getHeaders(),
+    );
+
+    _logResponse(
+      '$baseUrl/retailcounter_order/v1/ pending-bills?customer_id=$customerId',
+      response,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load pending bills');
+    }
+  }
+
+  Future<Map<String, dynamic>> payPendingBill({
+    required int orderId,
+    required int customerId,
+    required double amount,
+    required String paymentMethod,
+  }) async {
+    final response = await _postRequest('retailcounter_order/v1/pay-bill', {
+      "order_id": orderId,
+      "customer_id": customerId,
+      "amount": amount,
+      "payment_method": paymentMethod, // 'cash' or 'online'
+    });
+    return response;
+  }
+}
+
+// Custom API Exception
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+
+  ApiException(this.statusCode, this.message);
+
+  @override
+  String toString() => 'API Error ($statusCode): $message';
+}
+
+enum HttpMethod { get, post, put, delete, multipart }
