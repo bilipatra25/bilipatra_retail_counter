@@ -162,6 +162,14 @@ class AppProvider with ChangeNotifier {
 
   // 🟢 NEW: Auto Qty Discount Logic (Now sets Global)
   void _updateAutoGlobalDiscount() {
+    if (_cart.isEmpty) {
+      // ALWAYS reset discount if cart becomes empty, even if manual
+      _globalDiscountType = DiscountType.none;
+      _globalDiscountValue = 0.0;
+      _isGlobalDiscountManual = false;
+      return;
+    }
+    
     if (_isGlobalDiscountManual) return;
 
     // Only count products with weight >= 200g
