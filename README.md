@@ -1,16 +1,30 @@
-# bilipatra_retail_counter
+# Bilipatra Retail Counter POS
 
-A new Flutter project.
+This is the Retail Counter POS (Point of Sale) Flutter application. It provides an interface for managing in-store retail sales, processing offline and online payments (via QR), and handling customer credit accounts.
 
-## Getting Started
+## 🚀 Getting Started
 
-This project is a starting point for a Flutter application.
+To run the application locally:
+1. Ensure you have the Flutter SDK installed.
+2. Run `flutter pub get` to install dependencies.
+3. Use `flutter run` to launch the app on your connected device or emulator.
 
-A few resources to get you started if this is your first Flutter project:
+## 📲 App Distribution Standard Practice
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+When a new version of the frontend client (e.g., this POS App) is released, you must update the backend database configuration so the application can enforce version checks and provide download links for the update.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Execute the following SQL queries in the backend database to update the required configuration values (example for version `1.0.7`):
+
+```sql
+UPDATE b12greenStoreLocator.tbl_configuration
+	SET configuration_value='1.0.7'
+	WHERE configuration_id=8;
+    
+UPDATE b12greenStoreLocator.tbl_configuration
+	SET configuration_value='1.0.7'
+	WHERE configuration_id=7;
+    
+UPDATE b12greenStoreLocator.tbl_configuration
+	SET configuration_value='https://drive.google.com/file/d/1ymsFKw3Z2VKsL_cwT8yqN2Lv4F0KSCUN/view?usp=sharing'
+	WHERE configuration_id=6;
+```
