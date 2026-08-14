@@ -395,7 +395,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -416,7 +416,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -466,7 +466,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -497,7 +497,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -522,7 +522,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -550,7 +550,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
     if (storeId != null) {
@@ -581,7 +581,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -610,7 +610,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -631,7 +631,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -671,7 +671,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -692,7 +692,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -717,7 +717,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -740,7 +740,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
@@ -775,7 +775,7 @@ class ApiService {
     if (userJson != null) {
       try {
         final userData = jsonDecode(userJson);
-        storeId = userData['store_id'];
+        storeId = int.tryParse(userData['store_id']?.toString() ?? '');
       } catch (_) {}
     }
 
