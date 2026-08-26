@@ -113,8 +113,7 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
   }
 
   Widget _buildToggleButton(String text, bool isSelected, VoidCallback onTap) {
-    bool isAutoMode =
-        widget.specificItem == null && !widget.provider.isGlobalDiscountManual;
+    bool isAutoMode = widget.specificItem == null && widget.provider.isAutoDiscountEnabled && !widget.provider.isGlobalDiscountManual;
     return Expanded(
       child: GestureDetector(
         onTap: isAutoMode ? null : onTap,
@@ -146,8 +145,7 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
   Widget build(BuildContext context) {
     final provider = widget.provider;
     final specificItem = widget.specificItem;
-    final bool isAutoMode =
-        specificItem == null && !provider.isGlobalDiscountManual;
+    final bool isAutoMode = specificItem == null && provider.isAutoDiscountEnabled && !provider.isGlobalDiscountManual;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
@@ -215,14 +213,14 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
                       ),
                     ),
                     Text(
-                      provider.isGlobalDiscountManual
-                          ? "Currently: MANUAL OVERRIDE"
+                      (!provider.isAutoDiscountEnabled || provider.isGlobalDiscountManual)
+                          ? "Currently: AUTO DISCOUNT OFF"
                           : "Currently: AUTO CALCULATING",
                       style: TextStyle(
                         fontSize: 11,
                         color:
-                            provider.isGlobalDiscountManual
-                                ? Colors.orange.shade800
+                            (!provider.isAutoDiscountEnabled || provider.isGlobalDiscountManual)
+                                ? Colors.grey.shade600
                                 : Colors.green.shade800,
                         fontWeight: FontWeight.w500,
                       ),
@@ -230,19 +228,15 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
                   ],
                 ),
                 Switch(
-                  value: !provider.isGlobalDiscountManual,
+                  value: provider.isAutoDiscountEnabled && !provider.isGlobalDiscountManual,
                   activeThumbColor: Colors.green,
                   onChanged: (val) {
                     setState(() {
-                      provider.applyCartDiscount(
-                        DiscountType.none,
-                        0,
-                        provider.globalDiscountBase,
-                        isManual: !val,
-                      );
+                      provider.toggleAutoDiscount(val);
                       if (val) {
-                        _discountController.text = provider.globalDiscountValue
-                            .toStringAsFixed(0);
+                        _discountController.text = provider.globalDiscountValue > 0
+                            ? provider.globalDiscountValue.toStringAsFixed(0)
+                            : "";
                       } else {
                         _discountController.clear();
                       }

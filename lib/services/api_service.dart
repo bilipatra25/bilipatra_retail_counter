@@ -25,8 +25,8 @@ class ApiService {
   // static const String baseUrl = 'http://localhost:3131/storelocate';
 
   // static const String baseUrl = 'http://172.20.10.4:8084/storelocate';
-  // static const String baseUrl = 'http://192.168.29.72:3131/storelocate'; //Local
-  static const String baseUrl = 'https://store-locater.bilipatra.com/storelocate'; //Live
+  static const String baseUrl = 'http://192.168.1.16:3131/storelocate'; //Local
+  // static const String baseUrl = 'https://store-locater.bilipatra.com/storelocate'; //Live
   // static const String baseUrl = 'http://3.108.43.136:8084/storelocate'; //Dev
   ApiService(this.context);
 
@@ -279,26 +279,7 @@ class ApiService {
   }
 
   Future<bool> _isConnected() async {
-    var connectivityResult = await Connectivity().checkConnectivity();
-
-    // Step 1: Check if there is an active network connection (WiFi/Mobile)
-    if (!connectivityResult.contains(ConnectivityResult.mobile) &&
-        !connectivityResult.contains(ConnectivityResult.wifi) &&
-        !connectivityResult.contains(ConnectivityResult.ethernet)) {
-      return false; // No network detected
-    }
-
-    if (kIsWeb) return true; // InternetAddress is not supported on Web
-
-    // Step 2: Verify actual internet access by making a lightweight test request
-    try {
-      final result = await InternetAddress.lookup(
-        '8.8.8.8',
-      ); // Google's Public DNS
-      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-    } on SocketException {
-      return false; // No internet access
-    }
+    return true; // Bypass internet check for local testing
   }
 
   bool _isDialogShowing = false;
@@ -788,6 +769,17 @@ class ApiService {
     });
     return response;
   }
+
+  Future<Map<String, dynamic>> getConfigurations() async {
+    return await _postRequest('configuration/v1/apiselectall', {
+      'pageIndex': 1,
+      'pageSize': 50,
+    });
+  }
+
+  Future<Map<String, dynamic>> getFreeProductOffers() async {
+    return await _postRequest('free_product_offers/getOffers', {});
+  }
 }
 
 // Custom API Exception
@@ -802,3 +794,7 @@ class ApiException implements Exception {
 }
 
 enum HttpMethod { get, post, put, delete, multipart }
+
+
+
+

@@ -1061,12 +1061,39 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                           vertical: 0,
                         ),
                         visualDensity: VisualDensity.compact,
-                        title: Text(
-                          "${item.product.name} (${item.product.weight})",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                "${item.product.name} (${item.product.weight})",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            if (item.isFreeItem)
+                              Container(
+                                margin: const EdgeInsets.only(left: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade100,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Colors.green.shade300),
+                                ),
+                                child: const Text(
+                                  "FREE ITEM",
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1075,7 +1102,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                               "₹${item.product.price.toStringAsFixed(0)} x ${item.quantity}",
                               style: const TextStyle(fontSize: 12),
                             ),
-                            if (rowDiscount > 0)
+                            if (rowDiscount > 0 && !item.isFreeItem)
                               InkWell(
                                 onTap:
                                     () => _showDiscountDialog(
@@ -1107,9 +1134,10 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            IconButton(
-                              icon: Icon(
-                                Icons.local_offer_outlined,
+                            if (!item.isFreeItem)
+                              IconButton(
+                                icon: Icon(
+                                  Icons.local_offer_outlined,
                                 color:
                                     item.hasCustomDiscount
                                         ? Colors.orange
@@ -1123,9 +1151,10 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                                     specificItem: item,
                                   ),
                             ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
+                            if (!item.isFreeItem)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
                                 color: Colors.red,
                                 size: 20,
                               ),

@@ -4,6 +4,7 @@ enum DiscountType { none, flat, percent }
 enum DiscountBase { mrp, sellingPrice }
 
 class CartItem {
+  bool isFreeItem;
   final ProductModel product;
   int quantity;
 
@@ -16,6 +17,7 @@ class CartItem {
   CartItem({
     required this.product,
     this.quantity = 1,
+    this.isFreeItem = false,
     this.hasCustomDiscount = false,
     this.discountType = DiscountType.none,
     this.discountValue = 0.0,
@@ -23,8 +25,9 @@ class CartItem {
   });
 
   // Base pricing calculators
-  double get totalMrp => product.price * quantity;
+  double get totalMrp => isFreeItem ? 0.0 : product.price * quantity;
   double get totalSellingPrice {
+    if (isFreeItem) return 0.0;
     double basePrice = product.discountPrice > 0 ? product.discountPrice : product.price;
     return basePrice * quantity;
   }

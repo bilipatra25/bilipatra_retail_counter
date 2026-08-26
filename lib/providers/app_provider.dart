@@ -2,8 +2,83 @@ import 'package:flutter/material.dart';
 import '../models/cart_item_model.dart';
 import '../models/user.dart';
 import '../models/product.dart';
+import '../models/free_product_offer_model.dart';
 
 class AppProvider with ChangeNotifier {
+  List<FreeProductOffer> _freeOffers = [];
+  bool _isAutoDiscountEnabled = false;
+  bool get isAutoDiscountEnabled => _isAutoDiscountEnabled;
+  List<FreeProductOffer> get freeOffers => _freeOffers;
+
+  void toggleAutoDiscount(bool enable) {
+    _isAutoDiscountEnabled = enable;
+    _isGlobalDiscountManual = !enable;
+    if (enable) {
+      _updateAutoGlobalDiscount();
+    } else {
+      _globalDiscountType = DiscountType.none;
+      _globalDiscountValue = 0.0;
+    }
+    notifyListeners();
+  }
+
+  void setGlobalConfigs(bool autoDiscount, DiscountBase base) {
+    _isAutoDiscountEnabled = autoDiscount;
+    _globalDiscountBase = base;
+    _updateAutoGlobalDiscount();
+    notifyListeners();
+  }
+
+  void setFreeOffers(List<FreeProductOffer> offers) {
+    _freeOffers = offers;
+    _syncFreeItems();
+  }
+
+  void _syncFreeItems() {
+    if (_freeOffers.isEmpty) return;
+    Map<int, int> buyCounts = {};
+    for (var item in _cart) {
+      if (!item.isFreeItem) {
+        buyCounts[item.product.id] = (buyCounts[item.product.id] ?? 0) + item.quantity;
+      }
+    }
+    Map<int, FreeProductOffer> earned = {};
+    for (var offer in _freeOffers) {
+      int bought = buyCounts[offer.buyProductId] ?? 0;
+      int bundles = (bought / offer.buyQty).floor();
+      if (bundles > 0) {
+        if (!earned.containsKey(offer.freeProductId)) {
+          earned[offer.freeProductId] = FreeProductOffer(
+            id: offer.id, branchId: offer.branchId, buyProductId: offer.buyProductId,
+            buyQty: offer.buyQty, freeProductId: offer.freeProductId,
+            freeQty: bundles * offer.freeQty, isActive: offer.isActive,
+            freeProductDetail: offer.freeProductDetail,
+          );
+        } else {
+          var existing = earned[offer.freeProductId]!;
+          earned[offer.freeProductId] = FreeProductOffer(
+            id: existing.id, branchId: existing.branchId, buyProductId: existing.buyProductId,
+            buyQty: existing.buyQty, freeProductId: existing.freeProductId,
+            freeQty: existing.freeQty + (bundles * offer.freeQty), isActive: existing.isActive,
+            freeProductDetail: existing.freeProductDetail,
+          );
+        }
+      }
+    }
+    _cart.removeWhere((item) => item.isFreeItem);
+    earned.values.forEach((offer) {
+      _cart.add(CartItem(
+        product: offer.freeProductDetail,
+        quantity: offer.freeQty,
+        isFreeItem: true,
+        hasCustomDiscount: false,
+        discountType: DiscountType.none,
+        discountValue: 0.0,
+        discountBase: _globalDiscountBase,
+      ));
+    });
+    notifyListeners();
+  }
   // --- Customer State ---
   UserModel? _selectedCustomer;
   // final int defaultWalkInId = 1; //Testing
@@ -44,7 +119,7 @@ class AppProvider with ChangeNotifier {
   // --- Methods ---
   void addProduct(ProductModel product) {
     final existingIndex = _cart.indexWhere(
-      (item) => item.product.id == product.id,
+      (item) => item.product.id == product.id && !item.isFreeItem,
     );
     if (existingIndex >= 0) {
       _cart[existingIndex].quantity++;
@@ -52,12 +127,13 @@ class AppProvider with ChangeNotifier {
       _cart.add(CartItem(product: product));
     }
     _updateAutoGlobalDiscount();
+    _syncFreeItems();
     notifyListeners();
   }
 
   void decrementQuantity(ProductModel product) {
     final existingIndex = _cart.indexWhere(
-      (item) => item.product.id == product.id,
+      (item) => item.product.id == product.id && !item.isFreeItem,
     );
     if (existingIndex >= 0) {
       if (_cart[existingIndex].quantity > 1) {
@@ -66,7 +142,8 @@ class AppProvider with ChangeNotifier {
         _cart.removeAt(existingIndex);
       }
       _updateAutoGlobalDiscount();
-      notifyListeners();
+    _syncFreeItems();
+    notifyListeners();
     }
   }
 
@@ -76,7 +153,7 @@ class AppProvider with ChangeNotifier {
       return;
     }
     final existingIndex = _cart.indexWhere(
-      (item) => item.product.id == product.id,
+      (item) => item.product.id == product.id && !item.isFreeItem,
     );
     if (existingIndex >= 0) {
       _cart[existingIndex].quantity = quantity;
@@ -84,12 +161,14 @@ class AppProvider with ChangeNotifier {
       _cart.add(CartItem(product: product, quantity: quantity));
     }
     _updateAutoGlobalDiscount();
+    _syncFreeItems();
     notifyListeners();
   }
 
   void removeCartItem(ProductModel product) {
-    _cart.removeWhere((item) => item.product.id == product.id);
+    _cart.removeWhere((item) => item.product.id == product.id && !item.isFreeItem);
     _updateAutoGlobalDiscount();
+    _syncFreeItems();
     notifyListeners();
   }
 
@@ -163,7 +242,6 @@ class AppProvider with ChangeNotifier {
   // 🟢 NEW: Auto Qty Discount Logic (Now sets Global)
   void _updateAutoGlobalDiscount() {
     if (_cart.isEmpty) {
-      // ALWAYS reset discount if cart becomes empty, even if manual
       _globalDiscountType = DiscountType.none;
       _globalDiscountValue = 0.0;
       _isGlobalDiscountManual = false;
@@ -172,7 +250,12 @@ class AppProvider with ChangeNotifier {
     
     if (_isGlobalDiscountManual) return;
 
-    // Only count products with weight >= 200g
+    if (!_isAutoDiscountEnabled) {
+      _globalDiscountType = DiscountType.none;
+      _globalDiscountValue = 0.0;
+      return;
+    }
+
     int eligibleQty = _cart.fold(0, (sum, item) {
       return sum + (_isEligibleForAutoDiscount(item) ? item.quantity : 0);
     });
@@ -299,3 +382,4 @@ class AppProvider with ChangeNotifier {
     notifyListeners();
   }
 }
+

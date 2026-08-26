@@ -416,7 +416,7 @@ class _LeftPaneWidgetState extends State<LeftPaneWidget> {
 
                         final product = _filteredProducts[index];
                         final cartItemIndex = appProvider.cart.indexWhere(
-                          (c) => c.product.id == product.id,
+                          (c) => c.product.id == product.id && !c.isFreeItem,
                         );
                         final inCart = cartItemIndex >= 0;
                         final qtyInCart =
@@ -579,3 +579,4 @@ class _LeftPaneWidgetState extends State<LeftPaneWidget> {
     );
   }
 }
+

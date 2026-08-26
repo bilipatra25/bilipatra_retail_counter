@@ -7,6 +7,9 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../models/cart_item_model.dart';
+import '../../models/free_product_offer_model.dart';
+import '../../providers/app_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart'; // 🟢 Added this import
 import '../wholesale_inquiry_bottom_sheet.dart';
 import 'admin_dashboard_modal.dart';
@@ -32,10 +35,57 @@ class _PosDashboardScreenState extends State<PosDashboardScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppUpdateHelper.checkAppUpdate(context);
+      _loadGlobalConfigs();
     });
   }
 
   // 🟢 Helper to get version from platform
+  Future<void> _loadGlobalConfigs() async {
+    try {
+      final apiService = ApiService(context);
+      final configRes = await apiService.getConfigurations();
+      final offerRes = await apiService.getFreeProductOffers();
+      debugPrint("Loaded Configs: $configRes");
+      debugPrint("Loaded Offers: $offerRes");
+
+      if ((configRes["code"] == 200 || configRes["flag"] == 1) && configRes["data"] != null) {
+        dynamic rawData = configRes["data"];
+        List configs = [];
+        if (rawData is Map && rawData["result"] != null) {
+          configs = rawData["result"];
+        } else if (rawData is List) {
+          configs = rawData;
+        }
+
+        bool autoDiscount = false;
+        DiscountBase base = DiscountBase.sellingPrice;
+        for (var cfg in configs) {
+          if (cfg["configuration_key"] == "enable_auto_discount") {
+            final val = cfg["configuration_value"]?.toString().trim();
+            autoDiscount = (val == "1" || val == "true");
+          }
+          if (cfg["configuration_key"] == "default_discount_base") {
+            final val = cfg["configuration_value"]?.toString().trim().toLowerCase();
+            base = val == "mrp" ? DiscountBase.mrp : DiscountBase.sellingPrice;
+          }
+        }
+        debugPrint("🟢 Parsed autoDiscount: $autoDiscount, base: $base");
+        Provider.of<AppProvider>(context, listen: false).setGlobalConfigs(autoDiscount, base);
+      }
+
+      if ((offerRes["code"] == 200 || offerRes["flag"] == 1) && offerRes["data"] != null) {
+        final List<FreeProductOffer> parsedOffers = (offerRes["data"] as List)
+            .map((o) => FreeProductOffer.fromJson(o))
+            .toList();
+        debugPrint("Parsed Offers Count: ${parsedOffers.length}");
+        Provider.of<AppProvider>(context, listen: false).setFreeOffers(parsedOffers);
+      }
+    } catch (e, stack) {
+      debugPrint("Error loading configs: $e");
+      debugPrint(stack.toString());
+    }
+  }
+
   Future<void> _loadAppVersion() async {
     final info = await PackageInfo.fromPlatform();
     if (mounted) {
@@ -432,3 +482,5 @@ class _PosDashboardScreenState extends State<PosDashboardScreen> {
     );
   }
 }
+
+
