@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/cart_item_model.dart';
@@ -74,7 +73,24 @@ class CheckoutService {
 
     if (provider.globalDiscountValue > 0) {
       if (provider.globalDiscountType == DiscountType.percent) {
-        finalGlobalDiscountPercent = provider.globalDiscountValue;
+        if (provider.globalDiscountBase == DiscountBase.mrp) {
+          double totalMrp = provider.cart.fold(
+            0.0,
+            (sum, item) =>
+                sum +
+                (item.hasCustomDiscount || item.isFreeItem
+                    ? 0.0
+                    : item.totalMrp),
+          );
+          double discountAmount =
+              (totalMrp * provider.globalDiscountValue) / 100;
+          double subtotal = provider.cartSubtotal;
+          if (subtotal > 0) {
+            finalGlobalDiscountPercent = (discountAmount / subtotal) * 100;
+          }
+        } else {
+          finalGlobalDiscountPercent = provider.globalDiscountValue;
+        }
       } else if (provider.globalDiscountType == DiscountType.flat) {
         double subtotal = provider.cartSubtotal;
         if (subtotal > 0) {

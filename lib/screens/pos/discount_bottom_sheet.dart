@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../models/cart_item_model.dart';
 import '../../providers/app_provider.dart';
@@ -100,14 +99,12 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
         _selectedBase,
       );
     } else {
-      if (widget.provider.isGlobalDiscountManual) {
-        widget.provider.applyCartDiscount(
-          val > 0 ? _selectedType : DiscountType.none,
-          val,
-          _selectedBase,
-          isManual: true,
-        );
-      }
+      widget.provider.applyCartDiscount(
+        val > 0 ? _selectedType : DiscountType.none,
+        val,
+        _selectedBase,
+        isManual: true,
+      );
     }
     Navigator.pop(context);
   }
@@ -198,7 +195,7 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
           ),
           const SizedBox(height: 16),
 
-          if (specificItem == null) ...[
+          if (specificItem == null && provider.isAutoDiscountEnabled) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -213,13 +210,13 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
                       ),
                     ),
                     Text(
-                      (!provider.isAutoDiscountEnabled || provider.isGlobalDiscountManual)
+                      provider.isGlobalDiscountManual
                           ? "Currently: AUTO DISCOUNT OFF"
                           : "Currently: AUTO CALCULATING",
                       style: TextStyle(
                         fontSize: 11,
                         color:
-                            (!provider.isAutoDiscountEnabled || provider.isGlobalDiscountManual)
+                            provider.isGlobalDiscountManual
                                 ? Colors.grey.shade600
                                 : Colors.green.shade800,
                         fontWeight: FontWeight.w500,
@@ -228,7 +225,7 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
                   ],
                 ),
                 Switch(
-                  value: provider.isAutoDiscountEnabled && !provider.isGlobalDiscountManual,
+                  value: !provider.isGlobalDiscountManual,
                   activeThumbColor: Colors.green,
                   onChanged: (val) {
                     setState(() {

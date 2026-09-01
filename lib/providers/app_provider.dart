@@ -11,7 +11,6 @@ class AppProvider with ChangeNotifier {
   List<FreeProductOffer> get freeOffers => _freeOffers;
 
   void toggleAutoDiscount(bool enable) {
-    _isAutoDiscountEnabled = enable;
     _isGlobalDiscountManual = !enable;
     if (enable) {
       _updateAutoGlobalDiscount();
@@ -278,10 +277,7 @@ class AppProvider with ChangeNotifier {
 
   // Gets the exact discount for a specific item, respecting overrides
   double getItemCalculatedDiscount(CartItem item) {
-    double baseAmount =
-        item.discountBase == DiscountBase.mrp
-            ? item.totalMrp
-            : item.totalSellingPrice;
+    if (item.isFreeItem) return 0.0;
 
     // 1. ISOLATED OVERRIDE: If the item has a custom discount, it ONLY gets this.
     if (item.hasCustomDiscount) {
@@ -299,25 +295,32 @@ class AppProvider with ChangeNotifier {
         return 0.0;
       }
 
+      double globalBaseAmount =
+          _globalDiscountBase == DiscountBase.mrp
+              ? item.totalMrp
+              : item.totalSellingPrice;
+
       if (_globalDiscountType == DiscountType.percent) {
-        return (baseAmount * _globalDiscountValue) / 100;
+        return (globalBaseAmount * _globalDiscountValue) / 100;
       } else if (_globalDiscountType == DiscountType.flat) {
         // Find the total value of ONLY the items that are eligible for the global discount
         double cartEligibleTotal = _cart.fold(0.0, (sum, cartItem) {
+          if (cartItem.isFreeItem) return sum;
           if (cartItem.hasCustomDiscount) return sum; // Skip overridden items!
           // In Auto Mode, also skip small items for flat distribution (though auto is usually percent)
-          if (!_isGlobalDiscountManual && !_isEligibleForAutoDiscount(cartItem))
+          if (!_isGlobalDiscountManual && !_isEligibleForAutoDiscount(cartItem)) {
             return sum;
+          }
 
           return sum +
-              (cartItem.discountBase == DiscountBase.mrp
+              (_globalDiscountBase == DiscountBase.mrp
                   ? cartItem.totalMrp
                   : cartItem.totalSellingPrice);
         });
 
         // Distribute the flat global discount proportionally
         if (cartEligibleTotal > 0) {
-          return _globalDiscountValue * (baseAmount / cartEligibleTotal);
+          return _globalDiscountValue * (globalBaseAmount / cartEligibleTotal);
         }
       }
     }
@@ -326,7 +329,8 @@ class AppProvider with ChangeNotifier {
   }
 
   double getItemFinalTotal(CartItem item) {
-    return item.totalSellingPrice - getItemCalculatedDiscount(item);
+    final finalPrice = item.totalSellingPrice - getItemCalculatedDiscount(item);
+    return finalPrice < 0 ? 0.0 : finalPrice;
   }
 
   double get cartSubtotal =>
