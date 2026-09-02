@@ -11,6 +11,7 @@ class AppProvider with ChangeNotifier {
   List<FreeProductOffer> get freeOffers => _freeOffers;
 
   void toggleAutoDiscount(bool enable) {
+    _isAutoDiscountEnabled = enable;
     _isGlobalDiscountManual = !enable;
     if (enable) {
       _updateAutoGlobalDiscount();

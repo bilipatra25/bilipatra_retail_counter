@@ -195,7 +195,7 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
           ),
           const SizedBox(height: 16),
 
-          if (specificItem == null && provider.isAutoDiscountEnabled) ...[
+          if (specificItem == null) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -210,13 +210,13 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
                       ),
                     ),
                     Text(
-                      provider.isGlobalDiscountManual
+                      (!provider.isAutoDiscountEnabled || provider.isGlobalDiscountManual)
                           ? "Currently: AUTO DISCOUNT OFF"
                           : "Currently: AUTO CALCULATING",
                       style: TextStyle(
                         fontSize: 11,
                         color:
-                            provider.isGlobalDiscountManual
+                            (!provider.isAutoDiscountEnabled || provider.isGlobalDiscountManual)
                                 ? Colors.grey.shade600
                                 : Colors.green.shade800,
                         fontWeight: FontWeight.w500,
@@ -225,7 +225,7 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
                   ],
                 ),
                 Switch(
-                  value: !provider.isGlobalDiscountManual,
+                  value: provider.isAutoDiscountEnabled && !provider.isGlobalDiscountManual,
                   activeThumbColor: Colors.green,
                   onChanged: (val) {
                     setState(() {

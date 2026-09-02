@@ -1272,8 +1272,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                             ),
                           ),
 
-                        if (appProvider.isGlobalDiscountManual &&
-                            appProvider.isAutoDiscountEnabled)
+                        if (appProvider.isGlobalDiscountManual)
                           Padding(
                             padding: const EdgeInsets.only(left: 8),
                             child: SizedBox(
