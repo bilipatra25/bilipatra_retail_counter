@@ -1279,12 +1279,7 @@ class _RightPaneWidgetState extends State<RightPaneWidget> {
                               height: 24,
                               child: ElevatedButton(
                                 onPressed: () {
-                                  appProvider.applyCartDiscount(
-                                    DiscountType.none,
-                                    0,
-                                    DiscountBase.sellingPrice,
-                                    isManual: false,
-                                  );
+                                  appProvider.toggleAutoDiscount(true);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.blue.shade700,

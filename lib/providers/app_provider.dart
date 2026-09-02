@@ -257,6 +257,7 @@ class AppProvider with ChangeNotifier {
     }
 
     int eligibleQty = _cart.fold(0, (sum, item) {
+      if (item.isFreeItem) return sum;
       return sum + (_isEligibleForAutoDiscount(item) ? item.quantity : 0);
     });
 

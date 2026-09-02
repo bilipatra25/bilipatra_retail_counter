@@ -99,12 +99,18 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
         _selectedBase,
       );
     } else {
-      widget.provider.applyCartDiscount(
-        val > 0 ? _selectedType : DiscountType.none,
-        val,
-        _selectedBase,
-        isManual: true,
-      );
+      final bool isAutoMode = widget.provider.isAutoDiscountEnabled &&
+          !widget.provider.isGlobalDiscountManual;
+      if (isAutoMode) {
+        widget.provider.toggleAutoDiscount(true);
+      } else {
+        widget.provider.applyCartDiscount(
+          val > 0 ? _selectedType : DiscountType.none,
+          val,
+          _selectedBase,
+          isManual: true,
+        );
+      }
     }
     Navigator.pop(context);
   }
