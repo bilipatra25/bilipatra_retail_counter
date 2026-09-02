@@ -27,21 +27,24 @@ The application is built using the **Provider** pattern for state management. Ke
 
 ## 📲 App Distribution Standard Practice
 
-When a new version of the frontend client (e.g., this POS App) is released, you must update the backend database configuration so the application can enforce version checks and provide download links for the update.
-
-Execute the following SQL queries in the backend database to update the required configuration values (example for version `1.0.7`):
+Before distributing a new release APK:
+1. **Set Live Base URL**: Ensure `ApiService.baseUrl` in `lib/services/api_service.dart` is set to the Live production endpoint (`https://store-locater.bilipatra.com/storelocate`).
+2. **Upgrade Version**: Increment the version in `pubspec.yaml` (e.g., `version: 1.0.9+4`).
+3. **Build Release APK**: Run `flutter build apk --release --android-skip-build-dependency-validation`.
+4. **Naming Convention**: Name/copy the APK following the pattern: `Retail Counter POS v<version> <DD-MM-YY>.apk` (e.g. `Retail Counter POS v1.0.9 02-09-26.apk`).
+5. **Update Backend Configuration**: Upload the APK to Google Drive and update the backend database configuration values so that `AppUpdateHelper` can enforce updates and provide the download link:
 
 ```sql
 UPDATE b12greenStoreLocator.tbl_configuration
-	SET configuration_value='1.0.7'
+	SET configuration_value='1.0.9'
 	WHERE configuration_id=8;
     
 UPDATE b12greenStoreLocator.tbl_configuration
-	SET configuration_value='1.0.7'
+	SET configuration_value='1.0.9'
 	WHERE configuration_id=7;
     
 UPDATE b12greenStoreLocator.tbl_configuration
-	SET configuration_value='https://drive.google.com/file/d/1ymsFKw3Z2VKsL_cwT8yqN2Lv4F0KSCUN/view?usp=sharing'
+	SET configuration_value='https://drive.google.com/file/d/<FILE_ID>/view?usp=sharing'
 	WHERE configuration_id=6;
 ```
 
