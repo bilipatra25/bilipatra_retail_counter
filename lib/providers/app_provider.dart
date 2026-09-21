@@ -36,35 +36,77 @@ class AppProvider with ChangeNotifier {
 
   void _syncFreeItems() {
     if (_freeOffers.isEmpty) return;
+
+    // 1. Calculate non-free buy counts per product
     Map<int, int> buyCounts = {};
     for (var item in _cart) {
       if (!item.isFreeItem) {
         buyCounts[item.product.id] = (buyCounts[item.product.id] ?? 0) + item.quantity;
       }
     }
-    Map<int, FreeProductOffer> earned = {};
+
+    // 2. Group active offers by buyProductId -> buyQty -> List of FreeProductOffer
+    Map<int, Map<int, List<FreeProductOffer>>> productOffersMap = {};
     for (var offer in _freeOffers) {
-      int bought = buyCounts[offer.buyProductId] ?? 0;
-      int bundles = (bought / offer.buyQty).floor();
-      if (bundles > 0) {
-        if (!earned.containsKey(offer.freeProductId)) {
-          earned[offer.freeProductId] = FreeProductOffer(
-            id: offer.id, branchId: offer.branchId, buyProductId: offer.buyProductId,
-            buyQty: offer.buyQty, freeProductId: offer.freeProductId,
-            freeQty: bundles * offer.freeQty, isActive: offer.isActive,
-            freeProductDetail: offer.freeProductDetail,
-          );
-        } else {
-          var existing = earned[offer.freeProductId]!;
-          earned[offer.freeProductId] = FreeProductOffer(
-            id: existing.id, branchId: existing.branchId, buyProductId: existing.buyProductId,
-            buyQty: existing.buyQty, freeProductId: existing.freeProductId,
-            freeQty: existing.freeQty + (bundles * offer.freeQty), isActive: existing.isActive,
-            freeProductDetail: existing.freeProductDetail,
-          );
+      if (offer.isActive != 1) continue;
+      if (offer.buyProductId <= 0 || offer.buyQty <= 0) continue;
+
+      productOffersMap.putIfAbsent(offer.buyProductId, () => {});
+      productOffersMap[offer.buyProductId]!.putIfAbsent(offer.buyQty, () => []);
+      productOffersMap[offer.buyProductId]![offer.buyQty]!.add(offer);
+    }
+
+    // 3. Evaluate greedy waterfall breakdown for each product in cart
+    Map<int, FreeProductOffer> earned = {};
+
+    buyCounts.forEach((productId, boughtQty) {
+      final tiersMap = productOffersMap[productId];
+      if (tiersMap == null || tiersMap.isEmpty) return;
+
+      // Sort tiers descending by buyQty
+      final sortedBuyQtys = tiersMap.keys.toList()..sort((a, b) => b.compareTo(a));
+
+      int remainingQty = boughtQty;
+      for (final tierBuyQty in sortedBuyQtys) {
+        if (tierBuyQty > 0 && remainingQty >= tierBuyQty) {
+          final multiplier = remainingQty ~/ tierBuyQty;
+          remainingQty = remainingQty % tierBuyQty;
+
+          final giftOffers = tiersMap[tierBuyQty] ?? [];
+          for (final offer in giftOffers) {
+            final totalGrantedQty = multiplier * offer.freeQty;
+            if (totalGrantedQty <= 0) continue;
+
+            if (!earned.containsKey(offer.freeProductId)) {
+              earned[offer.freeProductId] = FreeProductOffer(
+                id: offer.id,
+                branchId: offer.branchId,
+                buyProductId: offer.buyProductId,
+                buyQty: offer.buyQty,
+                freeProductId: offer.freeProductId,
+                freeQty: totalGrantedQty,
+                isActive: offer.isActive,
+                freeProductDetail: offer.freeProductDetail,
+              );
+            } else {
+              var existing = earned[offer.freeProductId]!;
+              earned[offer.freeProductId] = FreeProductOffer(
+                id: existing.id,
+                branchId: existing.branchId,
+                buyProductId: existing.buyProductId,
+                buyQty: existing.buyQty,
+                freeProductId: existing.freeProductId,
+                freeQty: existing.freeQty + totalGrantedQty,
+                isActive: existing.isActive,
+                freeProductDetail: existing.freeProductDetail,
+              );
+            }
+          }
         }
       }
-    }
+    });
+
+    // 4. Update cart free items
     _cart.removeWhere((item) => item.isFreeItem);
     earned.values.forEach((offer) {
       _cart.add(CartItem(
